@@ -1,0 +1,51 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# Keys and secrets
+.env
+
+# Data files (will be mounted as volume in production)
+data/
+
+# Frontend build artifacts (will be built in Docker)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+CLAUDE.md
+
+# Test files
+test_*.py
+*_test.py
+
+# Misc
+*.log
+.python-version
+header.jpg
+start.sh

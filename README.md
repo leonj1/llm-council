@@ -59,12 +59,30 @@ CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
 
 ## Running the Application
 
-**Option 1: Use the start script**
+**Option 1: Docker (Recommended)**
+
+```bash
+# Build the Docker image
+make build
+
+# Start the container
+make start
+
+# Stop the container
+make stop
+
+# Restart the container
+make restart
+```
+
+Then open http://localhost:8001 in your browser.
+
+**Option 2: Use the start script**
 ```bash
 ./start.sh
 ```
 
-**Option 2: Run manually**
+**Option 3: Run manually**
 
 Terminal 1 (Backend):
 ```bash

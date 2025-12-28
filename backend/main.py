@@ -3,11 +3,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import uuid
 import json
 import asyncio
+import os
+from pathlib import Path
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
@@ -50,7 +53,7 @@ class Conversation(BaseModel):
     messages: List[Dict[str, Any]]
 
 
-@app.get("/")
+@app.get("/api")
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
@@ -192,6 +195,12 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Connection": "keep-alive",
         }
     )
+
+
+# Mount static files for frontend (if available)
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
 
 
 if __name__ == "__main__":
