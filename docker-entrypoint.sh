@@ -25,10 +25,10 @@ if [ -e /dev/net/tun ] && [ -n "$TS_AUTHKEY" ]; then
     echo "Tailscale connected!"
     tailscale status
     
-    # If TS_SERVE is enabled, set up Tailscale Serve for port 8001
+    # If TS_SERVE is enabled, set up Tailscale Serve for port 8004
     if [ "$TS_SERVE" = "true" ]; then
-        echo "Setting up Tailscale Serve on port 8001..."
-        tailscale serve --bg 8001
+        echo "Setting up Tailscale Serve on port 8004..."
+        tailscale serve --bg 8004
     fi
 elif [ -n "$TS_AUTHKEY" ]; then
     echo "WARNING: /dev/net/tun not available. Skipping Tailscale."
@@ -40,6 +40,6 @@ fi
 echo ""
 echo "Starting LLM Council backend..."
 
-# Use PORT env var if set (Railway sets this), otherwise default to 8001
-APP_PORT=${PORT:-8001}
+# Use PORT env var if set (Railway sets this), otherwise default to 8004
+APP_PORT=${PORT:-8004}
 exec python -m uvicorn backend.main:app --host 0.0.0.0 --port $APP_PORT

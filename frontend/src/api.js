@@ -3,7 +3,7 @@
  */
 
 // Use relative URLs for production, absolute for development
-const API_BASE = import.meta.env.DEV ? 'http://localhost:8001' : '';
+const API_BASE = import.meta.env.DEV ? 'http://localhost:8004' : '';
 
 export const api = {
   /**

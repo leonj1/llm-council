@@ -48,12 +48,12 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # Create data directory for conversations
 RUN mkdir -p /app/data/conversations
 
-# Expose port 8001 (backend FastAPI server)
-EXPOSE 8001
+# Expose port 8004 (backend FastAPI server)
+EXPOSE 8004
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8001
+ENV PORT=8004
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh

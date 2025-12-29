@@ -3,7 +3,7 @@
 # Variables
 IMAGE_NAME = llm-council
 CONTAINER_NAME = llm-council
-PORT = 8001
+PORT = 8004
 DATA_DIR = $(PWD)/data
 
 # Build the Docker image
@@ -16,6 +16,8 @@ start:
 		--name $(CONTAINER_NAME) \
 		-p $(PORT):$(PORT) \
 		-v $(DATA_DIR):/app/data \
+		--cap-add=NET_ADMIN \
+		--device=/dev/net/tun:/dev/net/tun \
 		--env-file .env \
 		$(IMAGE_NAME):latest
 
