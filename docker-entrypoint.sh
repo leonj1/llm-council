@@ -1,15 +1,14 @@
 #!/bin/bash
 set -e
 
-# Start Tailscale daemon
-echo "Starting Tailscale daemon..."
-tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+# Check if we can run Tailscale (need /dev/net/tun)
+if [ -e /dev/net/tun ] && [ -n "$TS_AUTHKEY" ]; then
+    echo "Starting Tailscale daemon..."
+    tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
 
-# Wait for tailscaled to be ready
-sleep 2
+    # Wait for tailscaled to be ready
+    sleep 2
 
-# Authenticate with Tailscale if auth key is provided
-if [ -n "$TS_AUTHKEY" ]; then
     echo "Authenticating with Tailscale..."
     
     # Build tailscale up command with optional parameters
@@ -18,11 +17,6 @@ if [ -n "$TS_AUTHKEY" ]; then
     # Set hostname if provided
     if [ -n "$TS_HOSTNAME" ]; then
         TS_UP_ARGS="$TS_UP_ARGS --hostname=$TS_HOSTNAME"
-    fi
-    
-    # Enable Tailscale Serve if requested (exposes port 8001 to tailnet)
-    if [ "$TS_SERVE" = "true" ]; then
-        TS_UP_ARGS="$TS_UP_ARGS"
     fi
     
     tailscale up $TS_UP_ARGS
@@ -36,11 +30,16 @@ if [ -n "$TS_AUTHKEY" ]; then
         echo "Setting up Tailscale Serve on port 8001..."
         tailscale serve --bg 8001
     fi
+elif [ -n "$TS_AUTHKEY" ]; then
+    echo "WARNING: /dev/net/tun not available. Skipping Tailscale."
+    echo "This is normal for cloud platforms like Railway."
 else
-    echo "WARNING: TS_AUTHKEY not set. Tailscale will not connect."
-    echo "Set TS_AUTHKEY environment variable to enable Tailscale."
+    echo "Tailscale not configured (TS_AUTHKEY not set)."
 fi
 
 echo ""
 echo "Starting LLM Council backend..."
-exec python -m backend.main
+
+# Use PORT env var if set (Railway sets this), otherwise default to 8001
+APP_PORT=${PORT:-8001}
+exec python -m uvicorn backend.main:app --host 0.0.0.0 --port $APP_PORT
