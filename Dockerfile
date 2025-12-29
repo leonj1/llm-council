@@ -21,8 +21,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies and Tailscale
 RUN apt-get update && apt-get install -y \
+    curl \
+    iptables \
+    ca-certificates \
+    && curl -fsSL https://tailscale.com/install.sh | sh \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies specification
@@ -51,5 +55,9 @@ EXPOSE 8001
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8001
 
-# Run the backend server
-CMD ["python", "-m", "backend.main"]
+# Copy entrypoint script
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Run via entrypoint script (handles Tailscale + app)
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
