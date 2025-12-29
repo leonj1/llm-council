@@ -9,6 +9,16 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showChat, setShowChat] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Load conversations on mount
   useEffect(() => {
@@ -55,6 +65,13 @@ function App() {
 
   const handleSelectConversation = (id) => {
     setCurrentConversationId(id);
+    if (isMobile) {
+      setShowChat(true);
+    }
+  };
+
+  const handleBackToList = () => {
+    setShowChat(false);
   };
 
   const handleSendMessage = async (content) => {
@@ -181,19 +198,29 @@ function App() {
     }
   };
 
+  const showSidebar = !isMobile || !showChat;
+  const showChatInterface = !isMobile || showChat;
+
   return (
-    <div className="app">
-      <Sidebar
-        conversations={conversations}
-        currentConversationId={currentConversationId}
-        onSelectConversation={handleSelectConversation}
-        onNewConversation={handleNewConversation}
-      />
-      <ChatInterface
-        conversation={currentConversation}
-        onSendMessage={handleSendMessage}
-        isLoading={isLoading}
-      />
+    <div className={`app ${isMobile ? 'mobile' : ''}`}>
+      {showSidebar && (
+        <Sidebar
+          conversations={conversations}
+          currentConversationId={currentConversationId}
+          onSelectConversation={handleSelectConversation}
+          onNewConversation={handleNewConversation}
+          isMobile={isMobile}
+        />
+      )}
+      {showChatInterface && (
+        <ChatInterface
+          conversation={currentConversation}
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+          isMobile={isMobile}
+          onBack={handleBackToList}
+        />
+      )}
     </div>
   );
 }
