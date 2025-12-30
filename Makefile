@@ -16,6 +16,7 @@ start:
 		--name $(CONTAINER_NAME) \
 		-p $(PORT):$(PORT) \
 		-v $(DATA_DIR):/app/data \
+		-v $(DATA_DIR)/tailscale:/var/lib/tailscale \
 		--cap-add=NET_ADMIN \
 		--device=/dev/net/tun:/dev/net/tun \
 		--env-file .env \

@@ -58,6 +58,9 @@ function App() {
         ...conversations,
       ]);
       setCurrentConversationId(newConv.id);
+      if (isMobile) {
+        setShowChat(true);
+      }
     } catch (error) {
       console.error('Failed to create conversation:', error);
     }
