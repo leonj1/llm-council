@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -5,22 +6,90 @@ export default function Sidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onDeleteConversation,
   isMobile,
 }) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const dropdownRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleNewConversation = (type) => {
+    onNewConversation(type);
+    setShowDropdown(false);
+  };
+
+  const handleMenuClick = (e, convId) => {
+    e.stopPropagation();
+    setOpenMenuId(openMenuId === convId ? null : convId);
+  };
+
+  const handleDelete = (e, convId) => {
+    e.stopPropagation();
+    if (confirm('Are you sure you want to delete this conversation?')) {
+      onDeleteConversation(convId);
+    }
+    setOpenMenuId(null);
+  };
+
   return (
     <div className={`sidebar ${isMobile ? 'mobile' : ''}`}>
       <div className="sidebar-header">
         <h1>LLM Council</h1>
-        <button className="new-conversation-btn" onClick={onNewConversation}>
-          + New Conversation
-        </button>
+        <div className="new-conversation-dropdown" ref={dropdownRef}>
+          <button
+            className="new-conversation-btn"
+            onClick={() => setShowDropdown(!showDropdown)}
+          >
+            + New
+          </button>
+          {showDropdown && (
+            <div className="dropdown-menu">
+              <button
+                className="dropdown-item"
+                onClick={() => handleNewConversation('council')}
+              >
+                <span className="dropdown-icon">💬</span>
+                <span className="dropdown-text">
+                  <span className="dropdown-title">New Conversation</span>
+                  <span className="dropdown-desc">Ask the council a question</span>
+                </span>
+              </button>
+              <button
+                className="dropdown-item"
+                onClick={() => handleNewConversation('movie_script')}
+              >
+                <span className="dropdown-icon">🎬</span>
+                <span className="dropdown-text">
+                  <span className="dropdown-title">New Movie Script</span>
+                  <span className="dropdown-desc">Collaborative script writing</span>
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={`conversation-list ${isMobile ? 'cards' : ''}`}>
         {conversations.length === 0 ? (
           <div className="no-conversations">
             <p>No conversations yet</p>
-            <p className="no-conversations-hint">Tap "New Conversation" to get started</p>
+            <p className="no-conversations-hint">Tap "+ New" to get started</p>
           </div>
         ) : (
           conversations.map((conv) => (
@@ -31,11 +100,38 @@ export default function Sidebar({
               }`}
               onClick={() => onSelectConversation(conv.id)}
             >
-              <div className="conversation-title">
-                {conv.title || 'New Conversation'}
+              <div className="conversation-type-icon">
+                {conv.type === 'movie_script' ? '🎬' : '💬'}
               </div>
-              <div className="conversation-meta">
-                {conv.message_count} messages
+              <div className="conversation-info">
+                <div className="conversation-title">
+                  {conv.title || 'New Conversation'}
+                </div>
+                <div className="conversation-meta">
+                  {conv.message_count} messages
+                </div>
+              </div>
+              <div
+                className="conversation-menu-wrapper"
+                ref={openMenuId === conv.id ? menuRef : null}
+              >
+                <button
+                  className="conversation-menu-btn"
+                  onClick={(e) => handleMenuClick(e, conv.id)}
+                  aria-label="Conversation options"
+                >
+                  ⋮
+                </button>
+                {openMenuId === conv.id && (
+                  <div className="conversation-menu">
+                    <button
+                      className="conversation-menu-item delete"
+                      onClick={(e) => handleDelete(e, conv.id)}
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+                )}
               </div>
               {isMobile && (
                 <div className="conversation-arrow">›</div>

@@ -1,0 +1,148 @@
+.stage3-movie-script {
+  background: #f0f8ff;
+  border-color: #b3d9ff;
+}
+
+.selection-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.winner-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb347 100%);
+  padding: 8px 16px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(255, 179, 71, 0.3);
+}
+
+.trophy {
+  font-size: 20px;
+}
+
+.winner-label {
+  font-weight: 600;
+  color: #7a5000;
+  font-size: 14px;
+}
+
+.winner-model {
+  color: #666;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.selection-rationale {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #d4e8ff;
+}
+
+.selection-rationale h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #4a90e2;
+  font-weight: 600;
+}
+
+.collaborators-preview {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #d4e8ff;
+}
+
+.collaborators-preview h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #4a90e2;
+  font-weight: 600;
+}
+
+.collaborator-tags {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.collaborator-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.collaborator-tag.author {
+  background: #e8f4fd;
+  color: #1976d2;
+  border: 1px solid #90caf9;
+}
+
+.collaborator-tag.collaborator {
+  background: #e8f5e9;
+  color: #388e3c;
+  border: 1px solid #a5d6a7;
+}
+
+.role-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+.plus {
+  color: #999;
+  font-size: 18px;
+  font-weight: 300;
+}
+
+.winning-script-details {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #d4e8ff;
+  overflow: hidden;
+}
+
+.winning-script-details summary {
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #4a90e2;
+  background: #f8fbff;
+  border-bottom: 1px solid #d4e8ff;
+  user-select: none;
+}
+
+.winning-script-details summary:hover {
+  background: #f0f7ff;
+}
+
+.winning-script-details[open] summary {
+  border-bottom: 1px solid #d4e8ff;
+}
+
+.winning-script-content {
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.winning-script-content pre {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+}

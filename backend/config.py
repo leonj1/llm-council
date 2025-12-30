@@ -10,7 +10,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # Council members - list of OpenRouter model identifiers
 COUNCIL_MODELS = [
-    "openai/gpt-5.2-pro",
+    "openai/gpt-5.1",
     "google/gemini-3-pro-preview",
     "anthropic/claude-opus-4.5",
     "x-ai/grok-4",
@@ -24,3 +24,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Data directory for conversation storage
 DATA_DIR = "data/conversations"
+
+# Movie Script Configuration
+MOVIE_SCRIPT_DEFAULT_TURNS = 3
+MOVIE_SCRIPT_MAX_TURNS = 7

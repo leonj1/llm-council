@@ -3,6 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
+import Stage3MovieScript from './Stage3MovieScript';
+import Stage4 from './Stage4';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -13,6 +15,7 @@ export default function ChatInterface({
   onBack,
 }) {
   const [input, setInput] = useState('');
+  const [numTurns, setNumTurns] = useState(3);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -26,7 +29,7 @@ export default function ChatInterface({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
-      onSendMessage(input);
+      onSendMessage(input, numTurns);
       setInput('');
     }
   };
@@ -38,6 +41,8 @@ export default function ChatInterface({
       handleSubmit(e);
     }
   };
+
+  const isMovieScript = conversation?.type === 'movie_script';
 
   if (!conversation) {
     return (
@@ -71,8 +76,12 @@ export default function ChatInterface({
       <div className="messages-container">
         {conversation.messages.length === 0 ? (
           <div className="empty-state">
-            <h2>Start a conversation</h2>
-            <p>Ask a question to consult the LLM Council</p>
+            <h2>{isMovieScript ? 'Create a Movie Script' : 'Start a conversation'}</h2>
+            <p>
+              {isMovieScript
+                ? 'Describe your movie idea and watch the council collaborate'
+                : 'Ask a question to consult the LLM Council'}
+            </p>
           </div>
         ) : (
           conversation.messages.map((msg, index) => (
@@ -88,13 +97,19 @@ export default function ChatInterface({
                 </div>
               ) : (
                 <div className="assistant-message">
-                  <div className="message-label">LLM Council</div>
+                  <div className="message-label">
+                    {isMovieScript ? 'Movie Script Studio' : 'LLM Council'}
+                  </div>
 
                   {/* Stage 1 */}
                   {msg.loading?.stage1 && (
                     <div className="stage-loading">
                       <div className="spinner"></div>
-                      <span>Running Stage 1: Collecting individual responses...</span>
+                      <span>
+                        {isMovieScript
+                          ? 'Running Stage 1: Generating script proposals...'
+                          : 'Running Stage 1: Collecting individual responses...'}
+                      </span>
                     </div>
                   )}
                   {msg.stage1 && <Stage1 responses={msg.stage1} />}
@@ -103,7 +118,7 @@ export default function ChatInterface({
                   {msg.loading?.stage2 && (
                     <div className="stage-loading">
                       <div className="spinner"></div>
-                      <span>Running Stage 2: Peer rankings...</span>
+                      <span>Running Stage 2: Peer review and ranking...</span>
                     </div>
                   )}
                   {msg.stage2 && (
@@ -114,14 +129,42 @@ export default function ChatInterface({
                     />
                   )}
 
-                  {/* Stage 3 */}
+                  {/* Stage 3 - Different component for movie script */}
                   {msg.loading?.stage3 && (
                     <div className="stage-loading">
                       <div className="spinner"></div>
-                      <span>Running Stage 3: Final synthesis...</span>
+                      <span>
+                        {isMovieScript
+                          ? 'Running Stage 3: Selecting best script...'
+                          : 'Running Stage 3: Final synthesis...'}
+                      </span>
                     </div>
                   )}
-                  {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
+                  {msg.stage3 && (
+                    isMovieScript ? (
+                      <Stage3MovieScript selection={msg.stage3} />
+                    ) : (
+                      <Stage3 finalResponse={msg.stage3} />
+                    )
+                  )}
+
+                  {/* Stage 4 - Movie script only */}
+                  {isMovieScript && (
+                    <>
+                      {msg.loading?.stage4 && !msg.stage4?.dialogue_history?.length && (
+                        <div className="stage-loading">
+                          <div className="spinner"></div>
+                          <span>Running Stage 4: Starting collaborative refinement...</span>
+                        </div>
+                      )}
+                      {(msg.stage4 || msg.loading?.stage4) && (
+                        <Stage4
+                          stage4Data={msg.stage4}
+                          isLoading={msg.loading?.stage4}
+                        />
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -131,7 +174,11 @@ export default function ChatInterface({
         {isLoading && (
           <div className="loading-indicator">
             <div className="spinner"></div>
-            <span>Consulting the council...</span>
+            <span>
+              {isMovieScript
+                ? 'Generating your movie script...'
+                : 'Consulting the council...'}
+            </span>
           </div>
         )}
 
@@ -142,19 +189,45 @@ export default function ChatInterface({
         <form className="input-form" onSubmit={handleSubmit}>
           <textarea
             className="message-input"
-            placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
+            placeholder={
+              isMovieScript
+                ? 'Describe your movie idea... (e.g., "A sci-fi thriller about AI becoming sentient")'
+                : 'Ask your question... (Shift+Enter for new line, Enter to send)'
+            }
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
             rows={3}
           />
+
+          {isMovieScript && (
+            <div className="turns-slider">
+              <label htmlFor="turns-input">
+                Collaboration turns: <strong>{numTurns}</strong>
+              </label>
+              <input
+                id="turns-input"
+                type="range"
+                min="1"
+                max="7"
+                value={numTurns}
+                onChange={(e) => setNumTurns(parseInt(e.target.value, 10))}
+                disabled={isLoading}
+              />
+              <div className="turns-labels">
+                <span>1</span>
+                <span>7</span>
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
             className="send-button"
             disabled={!input.trim() || isLoading}
           >
-            Send
+            {isMovieScript ? 'Generate Script' : 'Send'}
           </button>
         </form>
       )}

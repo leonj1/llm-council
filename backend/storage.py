@@ -18,12 +18,13 @@ def get_conversation_path(conversation_id: str) -> str:
     return os.path.join(DATA_DIR, f"{conversation_id}.json")
 
 
-def create_conversation(conversation_id: str) -> Dict[str, Any]:
+def create_conversation(conversation_id: str, conversation_type: str = "council") -> Dict[str, Any]:
     """
     Create a new conversation.
 
     Args:
         conversation_id: Unique identifier for the conversation
+        conversation_type: Type of conversation ("council" or "movie_script")
 
     Returns:
         New conversation dict
@@ -34,6 +35,7 @@ def create_conversation(conversation_id: str) -> Dict[str, Any]:
         "id": conversation_id,
         "created_at": datetime.utcnow().isoformat(),
         "title": "New Conversation",
+        "type": conversation_type,
         "messages": []
     }
 
@@ -78,6 +80,25 @@ def save_conversation(conversation: Dict[str, Any]):
         json.dump(conversation, f, indent=2)
 
 
+def delete_conversation(conversation_id: str) -> bool:
+    """
+    Delete a conversation from storage.
+
+    Args:
+        conversation_id: Unique identifier for the conversation
+
+    Returns:
+        True if deleted, False if not found
+    """
+    path = get_conversation_path(conversation_id)
+
+    if not os.path.exists(path):
+        return False
+
+    os.remove(path)
+    return True
+
+
 def list_conversations() -> List[Dict[str, Any]]:
     """
     List all conversations (metadata only).
@@ -98,6 +119,7 @@ def list_conversations() -> List[Dict[str, Any]]:
                     "id": data["id"],
                     "created_at": data["created_at"],
                     "title": data.get("title", "New Conversation"),
+                    "type": data.get("type", "council"),
                     "message_count": len(data["messages"])
                 })
 
@@ -169,4 +191,36 @@ def update_conversation_title(conversation_id: str, title: str):
         raise ValueError(f"Conversation {conversation_id} not found")
 
     conversation["title"] = title
+    save_conversation(conversation)
+
+
+def add_movie_script_message(
+    conversation_id: str,
+    stage1: List[Dict[str, Any]],
+    stage2: List[Dict[str, Any]],
+    stage3: Dict[str, Any],
+    stage4: Dict[str, Any]
+):
+    """
+    Add a movie script assistant message with all 4 stages to a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+        stage1: List of individual script responses
+        stage2: List of model rankings
+        stage3: Script selection result
+        stage4: Collaborative dialogue result
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    conversation["messages"].append({
+        "role": "assistant",
+        "stage1": stage1,
+        "stage2": stage2,
+        "stage3": stage3,
+        "stage4": stage4
+    })
+
     save_conversation(conversation)

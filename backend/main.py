@@ -14,6 +14,14 @@ from pathlib import Path
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .movie_script import (
+    stage1_generate_scripts,
+    stage2_peer_review,
+    stage3_select_best_script,
+    calculate_script_rankings,
+    CollaborativeDialogue
+)
+from .config import MOVIE_SCRIPT_DEFAULT_TURNS, MOVIE_SCRIPT_MAX_TURNS
 
 app = FastAPI(title="LLM Council API")
 
@@ -29,7 +37,7 @@ app.add_middleware(
 
 class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
-    pass
+    type: str = "council"  # "council" or "movie_script"
 
 
 class SendMessageRequest(BaseModel):
@@ -37,11 +45,18 @@ class SendMessageRequest(BaseModel):
     content: str
 
 
+class MovieScriptRequest(BaseModel):
+    """Request for movie script generation."""
+    content: str
+    num_turns: int = MOVIE_SCRIPT_DEFAULT_TURNS
+
+
 class ConversationMetadata(BaseModel):
     """Conversation metadata for list view."""
     id: str
     created_at: str
     title: str
+    type: str = "council"
     message_count: int
 
 
@@ -50,6 +65,7 @@ class Conversation(BaseModel):
     id: str
     created_at: str
     title: str
+    type: str = "council"
     messages: List[Dict[str, Any]]
 
 
@@ -69,7 +85,7 @@ async def list_conversations():
 async def create_conversation(request: CreateConversationRequest):
     """Create a new conversation."""
     conversation_id = str(uuid.uuid4())
-    conversation = storage.create_conversation(conversation_id)
+    conversation = storage.create_conversation(conversation_id, request.type)
     return conversation
 
 
@@ -80,6 +96,15 @@ async def get_conversation(conversation_id: str):
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
+
+
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a specific conversation."""
+    success = storage.delete_conversation(conversation_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"status": "deleted", "id": conversation_id}
 
 
 @app.post("/api/conversations/{conversation_id}/message")
@@ -178,6 +203,122 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 stage1_results,
                 stage2_results,
                 stage3_result
+            )
+
+            # Send completion event
+            yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+
+        except Exception as e:
+            # Send error event
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
+@app.post("/api/conversations/{conversation_id}/movie-script/stream")
+async def send_movie_script_stream(conversation_id: str, request: MovieScriptRequest):
+    """
+    Generate a movie script with streaming updates.
+    Returns Server-Sent Events as each stage completes.
+    """
+    # Check if conversation exists
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Validate num_turns
+    num_turns = max(1, min(request.num_turns, MOVIE_SCRIPT_MAX_TURNS))
+
+    # Check if this is the first message
+    is_first_message = len(conversation["messages"]) == 0
+
+    async def event_generator():
+        try:
+            # Add user message
+            storage.add_user_message(conversation_id, request.content)
+
+            # Start title generation in parallel (don't await yet)
+            title_task = None
+            if is_first_message:
+                title_task = asyncio.create_task(generate_conversation_title(request.content))
+
+            # Stage 1: Generate scripts
+            yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
+            stage1_results = await stage1_generate_scripts(request.content)
+            yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
+
+            if not stage1_results:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'All models failed to generate scripts'})}\n\n"
+                return
+
+            # Stage 2: Peer review
+            yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
+            stage2_results, label_to_model = await stage2_peer_review(request.content, stage1_results)
+            aggregate_rankings = calculate_script_rankings(stage2_results, label_to_model)
+            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
+
+            # Stage 3: Select best script
+            yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
+            stage3_result = await stage3_select_best_script(request.content, stage1_results, aggregate_rankings)
+            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+
+            # Stage 4: Collaborative dialogue
+            stage4_result = {
+                "dialogue_history": [],
+                "refined_script": stage3_result.get('winning_script', ''),
+                "collaborators": stage3_result.get('collaborators', []),
+                "num_turns": num_turns
+            }
+
+            if len(stage3_result.get('collaborators', [])) >= 2:
+                yield f"data: {json.dumps({'type': 'stage4_start', 'data': {'collaborators': stage3_result['collaborators'], 'num_turns': num_turns}})}\n\n"
+
+                dialogue = CollaborativeDialogue(
+                    model_a=stage3_result['collaborators'][0],
+                    model_b=stage3_result['collaborators'][1],
+                    winning_script=stage3_result['winning_script'],
+                    user_prompt=request.content,
+                    num_turns=num_turns
+                )
+
+                # Stream each dialogue turn
+                async for turn_data in dialogue.run_dialogue():
+                    yield f"data: {json.dumps({'type': 'stage4_turn', 'data': turn_data})}\n\n"
+
+                # Generate final refined script
+                refined_script = await dialogue.generate_final_script()
+
+                stage4_result = {
+                    "dialogue_history": dialogue.dialogue_history,
+                    "refined_script": refined_script,
+                    "collaborators": stage3_result['collaborators'],
+                    "num_turns": num_turns
+                }
+
+                yield f"data: {json.dumps({'type': 'stage4_complete', 'data': stage4_result})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'stage4_complete', 'data': stage4_result})}\n\n"
+
+            # Wait for title generation if it was started
+            if title_task:
+                title = await title_task
+                storage.update_conversation_title(conversation_id, title)
+                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+
+            # Save complete assistant message
+            storage.add_movie_script_message(
+                conversation_id,
+                stage1_results,
+                stage2_results,
+                stage3_result,
+                stage4_result
             )
 
             # Send completion event
