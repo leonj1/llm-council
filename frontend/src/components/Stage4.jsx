@@ -2,7 +2,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import './Stage4.css';
 
-export default function Stage4({ stage4Data, isLoading }) {
+export default function Stage4({ stage4Data, isLoading, onRegenerateFinalScript, isRegenerating }) {
   const [expandedTurns, setExpandedTurns] = useState({});
 
   if (!stage4Data && !isLoading) {
@@ -127,9 +127,25 @@ export default function Stage4({ stage4Data, isLoading }) {
           <h4 className="refined-script-header">
             <span className="script-icon">📜</span>
             Final Refined Script
+            {refinedScript === 'Unable to generate final script.' && onRegenerateFinalScript && (
+              <button
+                className="regenerate-btn"
+                onClick={onRegenerateFinalScript}
+                disabled={isRegenerating}
+              >
+                {isRegenerating ? 'Regenerating...' : 'Retry Generation'}
+              </button>
+            )}
           </h4>
           <div className="refined-script-content markdown-content">
-            <ReactMarkdown>{refinedScript}</ReactMarkdown>
+            {isRegenerating ? (
+              <div className="regenerating-indicator">
+                <div className="spinner"></div>
+                <span>Regenerating final script...</span>
+              </div>
+            ) : (
+              <ReactMarkdown>{refinedScript}</ReactMarkdown>
+            )}
           </div>
         </div>
       )}

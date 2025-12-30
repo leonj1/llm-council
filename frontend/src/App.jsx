@@ -9,6 +9,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showChat, setShowChat] = useState(false);
 
@@ -388,6 +389,39 @@ function App() {
     }
   };
 
+  const handleRegenerateFinalScript = async () => {
+    if (!currentConversationId) return;
+
+    setIsRegenerating(true);
+    try {
+      const result = await api.regenerateFinalScript(currentConversationId);
+
+      // Update the current conversation with the new refined script
+      setCurrentConversation((prev) => {
+        const messages = [...prev.messages];
+        // Find the last assistant message with stage4
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === 'assistant' && messages[i].stage4) {
+            messages[i] = {
+              ...messages[i],
+              stage4: {
+                ...messages[i].stage4,
+                refined_script: result.refined_script,
+              },
+            };
+            break;
+          }
+        }
+        return { ...prev, messages };
+      });
+    } catch (error) {
+      console.error('Failed to regenerate final script:', error);
+      alert('Failed to regenerate final script: ' + error.message);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   const showSidebar = !isMobile || !showChat;
   const showChatInterface = !isMobile || showChat;
 
@@ -410,6 +444,8 @@ function App() {
           isLoading={isLoading}
           isMobile={isMobile}
           onBack={handleBackToList}
+          onRegenerateFinalScript={handleRegenerateFinalScript}
+          isRegenerating={isRegenerating}
         />
       )}
     </div>

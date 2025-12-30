@@ -234,3 +234,35 @@
 .refined-script-content h3:first-child {
   margin-top: 0;
 }
+
+.regenerate-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.regenerate-btn:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.regenerate-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.regenerating-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: #666;
+  font-size: 14px;
+}

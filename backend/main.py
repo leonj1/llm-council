@@ -21,7 +21,7 @@ from .movie_script import (
     calculate_script_rankings,
     CollaborativeDialogue
 )
-from .config import MOVIE_SCRIPT_DEFAULT_TURNS, MOVIE_SCRIPT_MAX_TURNS
+from .config import MOVIE_SCRIPT_DEFAULT_TURNS, MOVIE_SCRIPT_MAX_TURNS, CHAIRMAN_MODEL
 
 app = FastAPI(title="LLM Council API")
 
@@ -220,6 +220,121 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Connection": "keep-alive",
         }
     )
+
+
+@app.post("/api/conversations/{conversation_id}/movie-script/regenerate-final")
+async def regenerate_final_script(conversation_id: str):
+    """
+    Regenerate the final script for a movie script conversation.
+    Uses the stored dialogue history to rebuild context and generate a new final script.
+    """
+    # Get conversation
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if conversation.get("type") != "movie_script":
+        raise HTTPException(status_code=400, detail="Not a movie script conversation")
+
+    # Find the last assistant message with stage4 data
+    messages = conversation.get("messages", [])
+    assistant_msg = None
+    user_prompt = None
+
+    for msg in messages:
+        if msg.get("role") == "user":
+            user_prompt = msg.get("content", "")
+        elif msg.get("role") == "assistant" and msg.get("stage4"):
+            assistant_msg = msg
+
+    if not assistant_msg or not user_prompt:
+        raise HTTPException(status_code=400, detail="No movie script data found to regenerate")
+
+    stage3 = assistant_msg.get("stage3", {})
+    stage4 = assistant_msg.get("stage4", {})
+    dialogue_history = stage4.get("dialogue_history", [])
+    collaborators = stage4.get("collaborators", stage3.get("collaborators", []))
+
+    if len(collaborators) < 2 or not dialogue_history:
+        raise HTTPException(status_code=400, detail="Insufficient dialogue history to regenerate")
+
+    winning_script = stage3.get("winning_script", "")
+    # Use current chairman model instead of stored model (which may no longer be available)
+    model_to_use = CHAIRMAN_MODEL
+    # Keep original model references for context replay
+    original_model_a = collaborators[0]
+
+    # Rebuild conversation context from dialogue history
+    base_context = f"""You are collaborating on refining a movie script.
+
+Original Request: {user_prompt}
+
+The Winning Script:
+{winning_script}
+
+Your goal is to work together to improve this script through constructive dialogue. Focus on:
+- Strengthening weak scenes
+- Improving dialogue
+- Enhancing character development
+- Tightening the narrative structure
+- Adding cinematic moments
+
+Be specific with your suggestions - reference exact scenes, characters, and dialogue."""
+
+    conversation_context_a = [{"role": "system", "content": base_context}]
+
+    # Replay the dialogue to rebuild context for the author role
+    for turn in dialogue_history:
+        if turn.get("model") == original_model_a:
+            # Original author's turn - they spoke
+            if turn.get("turn") == 1:
+                prompt = """As the author of this script, review your work and identify 2-3 specific areas you'd like to improve or expand. What aspects could be stronger? Where would you like fresh perspective?"""
+            else:
+                prompt = """Consider the collaborator's suggestions. Which ideas resonate with you? How would you incorporate them? Are there any suggestions you'd modify or push back on? Share your thoughts and any new ideas that emerged."""
+            conversation_context_a.append({"role": "user", "content": prompt})
+            conversation_context_a.append({"role": "assistant", "content": turn.get("message", "")})
+        else:
+            # Collaborator's turn - share with author
+            conversation_context_a.append({"role": "user", "content": f"The collaborator suggests:\n\n{turn.get('message', '')}"})
+
+    # Now generate the final script
+    from .openrouter import query_model
+
+    final_prompt = """Based on our collaborative discussion, produce the FINAL REFINED SCRIPT.
+
+Incorporate the best ideas from our dialogue. Present the complete refined script in proper screenplay format:
+
+**TITLE:**
+**LOGLINE:**
+**GENRE:**
+
+**REFINED OUTLINE:**
+- ACT 1:
+- ACT 2:
+- ACT 3:
+
+**KEY SCENES:** (Write out the improved/refined key scenes with proper formatting)
+
+Make this the best version of the script, synthesizing our collaborative improvements."""
+
+    conversation_context_a.append({"role": "user", "content": final_prompt})
+
+    # Use current chairman model to generate final script
+    response = await query_model(model_to_use, conversation_context_a, timeout=180.0)
+
+    if response:
+        refined_script = response.get('content', 'Unable to generate final script.')
+    else:
+        raise HTTPException(status_code=500, detail="Failed to generate final script")
+
+    # Update the stored conversation with the new refined script
+    stage4["refined_script"] = refined_script
+    storage.update_movie_script_stage4(conversation_id, stage4)
+
+    return {
+        "status": "success",
+        "refined_script": refined_script
+    }
 
 
 @app.post("/api/conversations/{conversation_id}/movie-script/stream")

@@ -224,3 +224,25 @@ def add_movie_script_message(
     })
 
     save_conversation(conversation)
+
+
+def update_movie_script_stage4(conversation_id: str, stage4: Dict[str, Any]):
+    """
+    Update stage4 of the last assistant message in a movie script conversation.
+    Used for regenerating the final script.
+
+    Args:
+        conversation_id: Conversation identifier
+        stage4: Updated stage4 data
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    # Find the last assistant message
+    for msg in reversed(conversation["messages"]):
+        if msg.get("role") == "assistant" and "stage4" in msg:
+            msg["stage4"] = stage4
+            break
+
+    save_conversation(conversation)

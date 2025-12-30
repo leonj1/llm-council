@@ -13,6 +13,8 @@ export default function ChatInterface({
   isLoading,
   isMobile,
   onBack,
+  onRegenerateFinalScript,
+  isRegenerating,
 }) {
   const [input, setInput] = useState('');
   const [numTurns, setNumTurns] = useState(3);
@@ -161,6 +163,8 @@ export default function ChatInterface({
                         <Stage4
                           stage4Data={msg.stage4}
                           isLoading={msg.loading?.stage4}
+                          onRegenerateFinalScript={onRegenerateFinalScript}
+                          isRegenerating={isRegenerating}
                         />
                       )}
                     </>

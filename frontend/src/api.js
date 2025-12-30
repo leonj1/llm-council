@@ -178,4 +178,28 @@ export const api = {
       }
     }
   },
+
+  /**
+   * Regenerate the final script for a movie script conversation.
+   * @param {string} conversationId - The conversation ID
+   * @returns {Promise<{status: string, refined_script: string}>}
+   */
+  async regenerateFinalScript(conversationId) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/movie-script/regenerate-final`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || 'Failed to regenerate final script');
+    }
+
+    return response.json();
+  },
 };
