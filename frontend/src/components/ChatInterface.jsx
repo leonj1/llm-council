@@ -18,7 +18,18 @@ export default function ChatInterface({
 }) {
   const [input, setInput] = useState('');
   const [numTurns, setNumTurns] = useState(3);
+  const [movieLength, setMovieLength] = useState(90);
   const messagesEndRef = useRef(null);
+
+  const movieLengthOptions = [
+    { value: 5, label: '5 min (Short)' },
+    { value: 15, label: '15 min (Short Film)' },
+    { value: 30, label: '30 min (TV Episode)' },
+    { value: 60, label: '60 min (TV Hour)' },
+    { value: 90, label: '90 min (Feature)' },
+    { value: 180, label: '180 min (Epic)' },
+    { value: 300, label: '300 min (Mini-Series)' },
+  ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -31,7 +42,7 @@ export default function ChatInterface({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
-      onSendMessage(input, numTurns);
+      onSendMessage(input, numTurns, movieLength);
       setInput('');
     }
   };
@@ -206,22 +217,40 @@ export default function ChatInterface({
           />
 
           {isMovieScript && (
-            <div className="turns-slider">
-              <label htmlFor="turns-input">
-                Collaboration turns: <strong>{numTurns}</strong>
-              </label>
-              <input
-                id="turns-input"
-                type="range"
-                min="1"
-                max="7"
-                value={numTurns}
-                onChange={(e) => setNumTurns(parseInt(e.target.value, 10))}
-                disabled={isLoading}
-              />
-              <div className="turns-labels">
-                <span>1</span>
-                <span>7</span>
+            <div className="movie-script-options">
+              <div className="movie-length-select">
+                <label htmlFor="length-input">Movie length:</label>
+                <select
+                  id="length-input"
+                  value={movieLength}
+                  onChange={(e) => setMovieLength(parseInt(e.target.value, 10))}
+                  disabled={isLoading}
+                >
+                  {movieLengthOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="turns-slider">
+                <label htmlFor="turns-input">
+                  Collaboration turns: <strong>{numTurns}</strong>
+                </label>
+                <input
+                  id="turns-input"
+                  type="range"
+                  min="1"
+                  max="7"
+                  value={numTurns}
+                  onChange={(e) => setNumTurns(parseInt(e.target.value, 10))}
+                  disabled={isLoading}
+                />
+                <div className="turns-labels">
+                  <span>1</span>
+                  <span>7</span>
+                </div>
               </div>
             </div>
           )}

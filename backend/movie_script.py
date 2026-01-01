@@ -1,24 +1,267 @@
 """4-stage Movie Script Generation workflow."""
 
+import logging
+import time
 import re
 from typing import List, Dict, Any, Tuple, AsyncGenerator
 from .openrouter import query_models_parallel, query_model
-from .config import COUNCIL_MODELS, MOVIE_SCRIPT_DEFAULT_TURNS
+from .config import get_primary_models, MOVIE_SCRIPT_DEFAULT_TURNS
+
+logger = logging.getLogger("llm-council.movie_script")
 
 
-async def stage1_generate_scripts(user_prompt: str) -> List[Dict[str, Any]]:
+def get_length_guidance(movie_length: int) -> str:
+    """Get script guidance based on movie length."""
+    if movie_length <= 5:
+        return "This is a SHORT FILM (5 minutes). Keep the story extremely focused with 1-2 scenes, minimal characters, and a single clear message or twist."
+    elif movie_length <= 15:
+        return "This is a SHORT FILM (15 minutes). Keep the story tight with 3-5 scenes, 2-3 characters, and a simple but complete narrative arc."
+    elif movie_length <= 30:
+        return "This is a TV EPISODE length (30 minutes). Include a clear A-plot with optional B-plot, 4-6 key scenes, and 3-5 main characters."
+    elif movie_length <= 60:
+        return "This is a TV HOUR (60 minutes). Include main and secondary plots, 8-10 key scenes, and a fuller cast of characters with subplots."
+    elif movie_length <= 90:
+        return "This is a FEATURE FILM (90 minutes). Create a full three-act structure with 10-15 key scenes, character development arcs, and satisfying resolution."
+    elif movie_length <= 180:
+        return "This is an EPIC FILM (180 minutes). Develop rich, complex storylines with multiple character arcs, extensive world-building, and 20+ key scenes."
+    else:
+        return "This is a MINI-SERIES length (300+ minutes). Plan for multiple episodes with overarching plot, character development across episodes, and 30+ key scenes."
+
+
+# Runtime estimation constants
+# Standard screenplay: ~180 words per minute of screen time
+# We use a slightly lower value for outlines/treatments since they're denser
+WORDS_PER_MINUTE = 150
+TOLERANCE_PERCENT = 80  # Allow ±80% variance before requiring refinement (relaxed for faster processing)
+MAX_REFINEMENT_ATTEMPTS = 1  # Maximum times to ask for expansion/condensation
+
+
+def estimate_runtime(script_text: str) -> int:
+    """
+    Estimate the runtime in minutes based on word count.
+
+    Args:
+        script_text: The script content
+
+    Returns:
+        Estimated runtime in minutes
+    """
+    word_count = len(script_text.split())
+    estimated_minutes = word_count / WORDS_PER_MINUTE
+    return round(estimated_minutes)
+
+
+def get_word_count(script_text: str) -> int:
+    """Get word count of script text."""
+    return len(script_text.split())
+
+
+def check_runtime_compliance(script_text: str, target_minutes: int) -> Dict[str, Any]:
+    """
+    Check if the script meets the target runtime within tolerance.
+
+    Args:
+        script_text: The script content
+        target_minutes: Target runtime in minutes
+
+    Returns:
+        Dict with compliance status and details
+    """
+    word_count = get_word_count(script_text)
+    estimated_runtime = estimate_runtime(script_text)
+
+    target_words = target_minutes * WORDS_PER_MINUTE
+    min_words = int(target_words * (1 - TOLERANCE_PERCENT / 100))
+    max_words = int(target_words * (1 + TOLERANCE_PERCENT / 100))
+
+    if word_count < min_words:
+        status = "too_short"
+        difference_percent = round((1 - word_count / target_words) * 100)
+    elif word_count > max_words:
+        status = "too_long"
+        difference_percent = round((word_count / target_words - 1) * 100)
+    else:
+        status = "compliant"
+        difference_percent = 0
+
+    return {
+        "status": status,
+        "word_count": word_count,
+        "estimated_runtime": estimated_runtime,
+        "target_runtime": target_minutes,
+        "target_words": target_words,
+        "min_words": min_words,
+        "max_words": max_words,
+        "difference_percent": difference_percent
+    }
+
+
+async def refine_script_length(
+    model: str,
+    script_text: str,
+    target_minutes: int,
+    user_prompt: str,
+    compliance: Dict[str, Any]
+) -> str:
+    """
+    Ask the model to expand or condense the script to meet runtime target.
+
+    Args:
+        model: The model to use for refinement
+        script_text: The current script
+        target_minutes: Target runtime in minutes
+        user_prompt: Original user prompt for context
+        compliance: The compliance check result
+
+    Returns:
+        Refined script text
+    """
+    action = "EXPAND" if compliance["status"] == "too_short" else "CONDENSE"
+    logger.info(f"    Refining script: {action}")
+    logger.info(f"      Current: {compliance['estimated_runtime']} min, Target: {target_minutes} min")
+    logger.info(f"      Word count: {compliance['word_count']} -> target ~{compliance['target_words']}")
+
+    refine_start = time.time()
+
+    if compliance["status"] == "too_short":
+        action = "EXPAND"
+        instruction = f"""Your script is too short. It's approximately {compliance['estimated_runtime']} minutes but needs to be {target_minutes} minutes.
+
+Please EXPAND the script by:
+- Adding more detailed scene descriptions
+- Expanding dialogue exchanges
+- Adding additional scenes or subplots
+- Developing character moments more fully
+- Including more action/transition descriptions
+
+Current word count: {compliance['word_count']}
+Target word count: approximately {compliance['target_words']} words (±{TOLERANCE_PERCENT}%)"""
+    else:  # too_long
+        action = "CONDENSE"
+        instruction = f"""Your script is too long. It's approximately {compliance['estimated_runtime']} minutes but needs to be {target_minutes} minutes.
+
+Please CONDENSE the script by:
+- Tightening dialogue (remove redundancy)
+- Combining or removing less essential scenes
+- Streamlining descriptions
+- Focusing on the core narrative
+- Cutting subplots that don't serve the main story
+
+Current word count: {compliance['word_count']}
+Target word count: approximately {compliance['target_words']} words (±{TOLERANCE_PERCENT}%)"""
+
+    refinement_prompt = f"""You previously wrote a script for: {user_prompt}
+
+{instruction}
+
+Here is your current script:
+{script_text}
+
+Please rewrite the COMPLETE script with the necessary adjustments to meet the {target_minutes}-minute runtime target. Maintain the same format:
+
+**TITLE:**
+**LOGLINE:**
+**GENRE:**
+**RUNTIME:** {target_minutes} minutes
+
+**OUTLINE:**
+- ACT 1:
+- ACT 2:
+- ACT 3:
+
+**KEY SCENES:** (adjusted for {target_minutes}-minute runtime)"""
+
+    messages = [{"role": "user", "content": refinement_prompt}]
+
+    response = await query_model(model, messages, timeout=180.0)
+
+    refine_elapsed = time.time() - refine_start
+    if response:
+        refined = response.get('content', script_text)
+        new_word_count = len(refined.split())
+        logger.info(f"      Refinement completed in {refine_elapsed:.2f}s")
+        logger.info(f"      New word count: {new_word_count}")
+        return refined
+    logger.warning(f"      Refinement failed after {refine_elapsed:.2f}s")
+    return script_text
+
+
+async def validate_and_refine_script(
+    model: str,
+    script_text: str,
+    target_minutes: int,
+    user_prompt: str
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Validate script runtime and refine if necessary.
+
+    Args:
+        model: The model to use for refinement
+        script_text: The script to validate
+        target_minutes: Target runtime in minutes
+        user_prompt: Original user prompt
+
+    Returns:
+        Tuple of (final_script, validation_result)
+    """
+    logger.debug(f"  Validating script for {model}")
+    current_script = script_text
+
+    for attempt in range(MAX_REFINEMENT_ATTEMPTS + 1):
+        compliance = check_runtime_compliance(current_script, target_minutes)
+        logger.debug(f"    Attempt {attempt}: status={compliance['status']}, words={compliance['word_count']}, runtime={compliance['estimated_runtime']}min")
+
+        if compliance["status"] == "compliant" or attempt == MAX_REFINEMENT_ATTEMPTS:
+            compliance["refinement_attempts"] = attempt
+            compliance["final"] = True
+            if attempt > 0:
+                logger.info(f"    Script refined after {attempt} attempt(s)")
+            return current_script, compliance
+
+        # Need to refine
+        logger.info(f"    Script needs refinement (attempt {attempt + 1}/{MAX_REFINEMENT_ATTEMPTS})")
+        compliance["refinement_attempts"] = attempt
+        compliance["final"] = False
+
+        current_script = await refine_script_length(
+            model, current_script, target_minutes, user_prompt, compliance
+        )
+
+    # Return whatever we have after max attempts
+    final_compliance = check_runtime_compliance(current_script, target_minutes)
+    final_compliance["refinement_attempts"] = MAX_REFINEMENT_ATTEMPTS
+    final_compliance["final"] = True
+    logger.info(f"    Max refinement attempts reached. Final status: {final_compliance['status']}")
+
+    return current_script, final_compliance
+
+
+async def stage1_generate_scripts(user_prompt: str, movie_length: int = 90) -> List[Dict[str, Any]]:
     """
     Stage 1: Each model creates their own script (outline + key scenes).
 
     Args:
         user_prompt: The user's movie idea/description
+        movie_length: Target length in minutes
 
     Returns:
         List of dicts with 'model' and 'response' keys
     """
+    models = get_primary_models()
+    logger.info(f"Stage 1: Generating scripts from {len(models)} models")
+    logger.info(f"  Models: {[m.split('/')[-1] for m in models]}")
+    logger.info(f"  Target length: {movie_length} minutes")
+
+    start_time = time.time()
+    length_guidance = get_length_guidance(movie_length)
+    logger.debug(f"  Length guidance: {length_guidance[:50]}...")
+
     script_prompt = f"""You are a professional screenwriter. Create a movie script based on the following idea:
 
 {user_prompt}
+
+TARGET LENGTH: {movie_length} minutes
+{length_guidance}
 
 Provide your script in the following format:
 
@@ -28,32 +271,42 @@ Provide your script in the following format:
 
 **GENRE:** Primary genre and any secondary genres
 
+**RUNTIME:** {movie_length} minutes
+
 **OUTLINE:**
 - ACT 1 (Setup): Key plot points
 - ACT 2 (Confrontation): Key plot points
 - ACT 3 (Resolution): Key plot points
 
-**KEY SCENES:** Write 3-5 of the most important scenes with:
+**KEY SCENES:** Write the most important scenes appropriate for a {movie_length}-minute film with:
 - Scene heading (INT/EXT, LOCATION - TIME)
 - Action lines describing what happens
 - Character dialogue
 
-Format your response as a professional screenplay excerpt. Be creative and specific with your choices."""
+Format your response as a professional screenplay excerpt. Be creative and specific with your choices. Scale the complexity and number of scenes appropriately for the {movie_length}-minute runtime."""
 
     messages = [{"role": "user", "content": script_prompt}]
 
     # Query all models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    logger.info("  Querying models in parallel...")
+    responses = await query_models_parallel(models, messages)
+    elapsed = time.time() - start_time
 
     # Format results
     stage1_results = []
     for model, response in responses.items():
         if response is not None:
+            content = response.get('content', '')
+            word_count = len(content.split())
+            logger.info(f"  ✓ {model.split('/')[-1]}: {word_count} words")
             stage1_results.append({
                 "model": model,
-                "response": response.get('content', '')
+                "response": content
             })
+        else:
+            logger.warning(f"  ✗ {model.split('/')[-1]}: FAILED")
 
+    logger.info(f"Stage 1 complete: {len(stage1_results)}/{len(models)} scripts in {elapsed:.2f}s")
     return stage1_results
 
 
@@ -71,6 +324,9 @@ async def stage2_peer_review(
     Returns:
         Tuple of (rankings list, label_to_model mapping)
     """
+    logger.info(f"Stage 2: Peer review of {len(stage1_results)} scripts")
+    start_time = time.time()
+
     # Create anonymized labels for scripts (Script A, Script B, etc.)
     labels = [chr(65 + i) for i in range(len(stage1_results))]  # A, B, C, ...
 
@@ -123,7 +379,9 @@ Now provide your evaluation and ranking:"""
     messages = [{"role": "user", "content": ranking_prompt}]
 
     # Get rankings from all council models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    logger.info("  Querying models for rankings...")
+    responses = await query_models_parallel(get_primary_models(), messages)
+    elapsed = time.time() - start_time
 
     # Format results
     stage2_results = []
@@ -131,12 +389,18 @@ Now provide your evaluation and ranking:"""
         if response is not None:
             full_text = response.get('content', '')
             parsed = parse_script_ranking(full_text)
+            logger.info(f"  ✓ {model.split('/')[-1]}: ranked {len(parsed)} scripts")
+            if parsed:
+                logger.debug(f"    Ranking: {' > '.join(parsed)}")
             stage2_results.append({
                 "model": model,
                 "ranking": full_text,
                 "parsed_ranking": parsed
             })
+        else:
+            logger.warning(f"  ✗ {model.split('/')[-1]}: FAILED")
 
+    logger.info(f"Stage 2 complete: {len(stage2_results)} rankings in {elapsed:.2f}s")
     return stage2_results, label_to_model
 
 
@@ -278,22 +542,29 @@ class CollaborativeDialogue:
         model_b: str,
         winning_script: str,
         user_prompt: str,
-        num_turns: int = MOVIE_SCRIPT_DEFAULT_TURNS
+        num_turns: int = MOVIE_SCRIPT_DEFAULT_TURNS,
+        movie_length: int = 90
     ):
         self.model_a = model_a  # Winner (primary author)
         self.model_b = model_b  # Runner-up (collaborator)
         self.winning_script = winning_script
         self.user_prompt = user_prompt
         self.num_turns = num_turns
+        self.movie_length = movie_length
         self.dialogue_history: List[Dict[str, Any]] = []
         self.conversation_context_a: List[Dict[str, str]] = []
         self.conversation_context_b: List[Dict[str, str]] = []
 
     def _initialize_context(self):
         """Initialize conversation context for both models."""
+        length_guidance = get_length_guidance(self.movie_length)
+
         base_context = f"""You are collaborating on refining a movie script.
 
 Original Request: {self.user_prompt}
+
+TARGET RUNTIME: {self.movie_length} minutes
+{length_guidance}
 
 The Winning Script:
 {self.winning_script}
@@ -304,6 +575,7 @@ Your goal is to work together to improve this script through constructive dialog
 - Enhancing character development
 - Tightening the narrative structure
 - Adding cinematic moments
+- Ensuring the script is appropriately paced for the {self.movie_length}-minute runtime
 
 Be specific with your suggestions - reference exact scenes, characters, and dialogue."""
 
@@ -317,18 +589,30 @@ Be specific with your suggestions - reference exact scenes, characters, and dial
         Yields:
             Dict with turn info: {turn, model, role, message}
         """
+        logger.info(f"Starting collaborative dialogue: {self.num_turns} turns")
+        logger.info(f"  Author: {self.model_a.split('/')[-1]}")
+        logger.info(f"  Collaborator: {self.model_b.split('/')[-1]}")
+
         self._initialize_context()
 
         for turn in range(1, self.num_turns + 1):
+            logger.info(f"  Turn {turn}/{self.num_turns}")
+
             # Model A (winner/author) speaks
+            turn_start = time.time()
             turn_a = await self._execute_turn_a(turn)
+            logger.info(f"    Author responded in {time.time() - turn_start:.2f}s ({len(turn_a['message'])} chars)")
             self.dialogue_history.append(turn_a)
             yield turn_a
 
             # Model B (collaborator) responds
+            turn_start = time.time()
             turn_b = await self._execute_turn_b(turn)
+            logger.info(f"    Collaborator responded in {time.time() - turn_start:.2f}s ({len(turn_b['message'])} chars)")
             self.dialogue_history.append(turn_b)
             yield turn_b
+
+        logger.info(f"Dialogue complete: {len(self.dialogue_history)} total messages")
 
     async def _execute_turn_a(self, turn: int) -> Dict[str, Any]:
         """Execute Model A's turn (the author)."""
@@ -381,29 +665,40 @@ Be specific with your suggestions - reference exact scenes, characters, and dial
         Generate the final refined script after dialogue completes.
         Model A (the author) produces the final version.
         """
-        final_prompt = """Based on our collaborative discussion, produce the FINAL REFINED SCRIPT.
+        logger.info("Generating final refined script...")
+        logger.info(f"  Author model: {self.model_a.split('/')[-1]}")
+        start_time = time.time()
+
+        final_prompt = f"""Based on our collaborative discussion, produce the FINAL REFINED SCRIPT for a {self.movie_length}-minute film.
 
 Incorporate the best ideas from our dialogue. Present the complete refined script in proper screenplay format:
 
 **TITLE:**
 **LOGLINE:**
 **GENRE:**
+**RUNTIME:** {self.movie_length} minutes
 
 **REFINED OUTLINE:**
 - ACT 1:
 - ACT 2:
 - ACT 3:
 
-**KEY SCENES:** (Write out the improved/refined key scenes with proper formatting)
+**KEY SCENES:** (Write out the improved/refined key scenes with proper formatting, appropriate for a {self.movie_length}-minute runtime)
 
-Make this the best version of the script, synthesizing our collaborative improvements."""
+Make this the best version of the script, synthesizing our collaborative improvements for a {self.movie_length}-minute film."""
 
         self.conversation_context_a.append({"role": "user", "content": final_prompt})
 
         response = await query_model(self.model_a, self.conversation_context_a, timeout=180.0)
+        elapsed = time.time() - start_time
 
         if response:
-            return response.get('content', 'Unable to generate final script.')
+            content = response.get('content', 'Unable to generate final script.')
+            word_count = len(content.split())
+            logger.info(f"  Final script generated in {elapsed:.2f}s")
+            logger.info(f"  Word count: {word_count}")
+            return content
+        logger.warning(f"  Failed to generate final script after {elapsed:.2f}s")
         return "Unable to generate final script."
 
     def get_results(self) -> Dict[str, Any]:

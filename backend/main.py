@@ -1,5 +1,7 @@
 """FastAPI backend for LLM Council."""
 
+import logging
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -12,6 +14,14 @@ import asyncio
 import os
 from pathlib import Path
 
+# Configure verbose logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(name)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("llm-council")
+
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 from .movie_script import (
@@ -19,7 +29,9 @@ from .movie_script import (
     stage2_peer_review,
     stage3_select_best_script,
     calculate_script_rankings,
-    CollaborativeDialogue
+    CollaborativeDialogue,
+    validate_and_refine_script,
+    check_runtime_compliance
 )
 from .config import MOVIE_SCRIPT_DEFAULT_TURNS, MOVIE_SCRIPT_MAX_TURNS, CHAIRMAN_MODEL
 
@@ -49,6 +61,7 @@ class MovieScriptRequest(BaseModel):
     """Request for movie script generation."""
     content: str
     num_turns: int = MOVIE_SCRIPT_DEFAULT_TURNS
+    movie_length: int = 90  # Default 90 minutes (feature film)
 
 
 class ConversationMetadata(BaseModel):
@@ -343,48 +356,148 @@ async def send_movie_script_stream(conversation_id: str, request: MovieScriptReq
     Generate a movie script with streaming updates.
     Returns Server-Sent Events as each stage completes.
     """
+    workflow_start = time.time()
+    logger.info("=" * 60)
+    logger.info("MOVIE SCRIPT WORKFLOW STARTED")
+    logger.info(f"  Conversation ID: {conversation_id}")
+    logger.info(f"  User prompt: {request.content[:100]}...")
+    logger.info(f"  Target movie length: {request.movie_length} minutes")
+    logger.info(f"  Collaboration turns: {request.num_turns}")
+    logger.info("=" * 60)
+
     # Check if conversation exists
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
+        logger.error(f"Conversation not found: {conversation_id}")
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Validate num_turns
     num_turns = max(1, min(request.num_turns, MOVIE_SCRIPT_MAX_TURNS))
+    movie_length = request.movie_length
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
+    logger.info(f"Is first message: {is_first_message}")
 
     async def event_generator():
         try:
             # Add user message
             storage.add_user_message(conversation_id, request.content)
+            logger.info("User message saved to storage")
 
             # Start title generation in parallel (don't await yet)
             title_task = None
             if is_first_message:
+                logger.info("Starting title generation task (background)")
                 title_task = asyncio.create_task(generate_conversation_title(request.content))
 
-            # Stage 1: Generate scripts
+            # ========== STAGE 1: Generate Scripts ==========
+            logger.info("-" * 50)
+            logger.info("STAGE 1: GENERATING SCRIPTS")
+            logger.info("-" * 50)
+            stage1_start = time.time()
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_generate_scripts(request.content)
+            logger.info("  Querying all council models in parallel...")
+
+            stage1_results = await stage1_generate_scripts(request.content, movie_length)
+            stage1_elapsed = time.time() - stage1_start
+
+            logger.info(f"  Stage 1 completed in {stage1_elapsed:.2f}s")
+            logger.info(f"  Received {len(stage1_results)} scripts from models:")
+            for result in stage1_results:
+                word_count = len(result['response'].split())
+                logger.info(f"    - {result['model']}: {word_count} words")
+
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
             if not stage1_results:
+                logger.error("All models failed to generate scripts!")
                 yield f"data: {json.dumps({'type': 'error', 'message': 'All models failed to generate scripts'})}\n\n"
                 return
 
-            # Stage 2: Peer review
+            # ========== STAGE 1.5: Validate Runtime ==========
+            logger.info("-" * 50)
+            logger.info("STAGE 1.5: VALIDATING RUNTIME COMPLIANCE")
+            logger.info("-" * 50)
+            validation_start = time.time()
+            yield f"data: {json.dumps({'type': 'validation_start', 'stage': 'stage1'})}\n\n"
+
+            refined_stage1_results = []
+            for result in stage1_results:
+                model = result['model']
+                script = result['response']
+                logger.info(f"  Validating {model}...")
+
+                # Validate and refine if needed
+                refined_script, compliance = await validate_and_refine_script(
+                    model, script, movie_length, request.content
+                )
+
+                logger.info(f"    Status: {compliance['status']}")
+                logger.info(f"    Word count: {compliance['word_count']}")
+                logger.info(f"    Estimated runtime: {compliance['estimated_runtime']} min (target: {movie_length} min)")
+                if compliance.get('refinement_attempts', 0) > 0:
+                    logger.info(f"    Refinement attempts: {compliance['refinement_attempts']}")
+
+                refined_stage1_results.append({
+                    'model': model,
+                    'response': refined_script,
+                    'runtime_validation': compliance
+                })
+
+                # Stream validation result for this model
+                yield f"data: {json.dumps({'type': 'validation_result', 'model': model, 'compliance': compliance})}\n\n"
+
+            stage1_results = refined_stage1_results
+            validation_elapsed = time.time() - validation_start
+            logger.info(f"  Stage 1.5 validation completed in {validation_elapsed:.2f}s")
+            yield f"data: {json.dumps({'type': 'validation_complete', 'stage': 'stage1'})}\n\n"
+
+            # ========== STAGE 2: Peer Review ==========
+            logger.info("-" * 50)
+            logger.info("STAGE 2: PEER REVIEW")
+            logger.info("-" * 50)
+            stage2_start = time.time()
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
+            logger.info("  Models are reviewing and ranking scripts...")
+
             stage2_results, label_to_model = await stage2_peer_review(request.content, stage1_results)
             aggregate_rankings = calculate_script_rankings(stage2_results, label_to_model)
+            stage2_elapsed = time.time() - stage2_start
+
+            logger.info(f"  Stage 2 completed in {stage2_elapsed:.2f}s")
+            logger.info(f"  Received {len(stage2_results)} rankings")
+            logger.info("  Label to model mapping:")
+            for label, model in label_to_model.items():
+                logger.info(f"    {label} -> {model}")
+            logger.info("  Aggregate rankings:")
+            for rank in aggregate_rankings:
+                logger.info(f"    {rank['model']}: avg rank {rank['average_rank']:.2f} ({rank['rankings_count']} votes)")
+
             yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
 
-            # Stage 3: Select best script
+            # ========== STAGE 3: Select Best Script ==========
+            logger.info("-" * 50)
+            logger.info("STAGE 3: SELECT BEST SCRIPT")
+            logger.info("-" * 50)
+            stage3_start = time.time()
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
+
             stage3_result = await stage3_select_best_script(request.content, stage1_results, aggregate_rankings)
+            stage3_elapsed = time.time() - stage3_start
+
+            logger.info(f"  Stage 3 completed in {stage3_elapsed:.2f}s")
+            logger.info(f"  Winning model: {stage3_result['winning_model']}")
+            logger.info(f"  Collaborators: {stage3_result['collaborators']}")
+
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
-            # Stage 4: Collaborative dialogue
+            # ========== STAGE 4: Collaborative Dialogue ==========
+            logger.info("-" * 50)
+            logger.info("STAGE 4: COLLABORATIVE DIALOGUE")
+            logger.info("-" * 50)
+            stage4_start = time.time()
+
             stage4_result = {
                 "dialogue_history": [],
                 "refined_script": stage3_result.get('winning_script', ''),
@@ -393,6 +506,10 @@ async def send_movie_script_stream(conversation_id: str, request: MovieScriptReq
             }
 
             if len(stage3_result.get('collaborators', [])) >= 2:
+                logger.info(f"  Starting {num_turns}-turn collaborative dialogue")
+                logger.info(f"  Author (Model A): {stage3_result['collaborators'][0]}")
+                logger.info(f"  Collaborator (Model B): {stage3_result['collaborators'][1]}")
+
                 yield f"data: {json.dumps({'type': 'stage4_start', 'data': {'collaborators': stage3_result['collaborators'], 'num_turns': num_turns}})}\n\n"
 
                 dialogue = CollaborativeDialogue(
@@ -400,34 +517,74 @@ async def send_movie_script_stream(conversation_id: str, request: MovieScriptReq
                     model_b=stage3_result['collaborators'][1],
                     winning_script=stage3_result['winning_script'],
                     user_prompt=request.content,
-                    num_turns=num_turns
+                    num_turns=num_turns,
+                    movie_length=movie_length
                 )
 
                 # Stream each dialogue turn
+                turn_count = 0
                 async for turn_data in dialogue.run_dialogue():
+                    turn_count += 1
+                    logger.info(f"  Turn {turn_data['turn']} - {turn_data['role']} ({turn_data['model']})")
+                    logger.info(f"    Message length: {len(turn_data['message'])} chars")
                     yield f"data: {json.dumps({'type': 'stage4_turn', 'data': turn_data})}\n\n"
 
+                logger.info(f"  Dialogue complete ({turn_count} turns)")
+                logger.info("  Generating final refined script...")
+
                 # Generate final refined script
+                final_script_start = time.time()
                 refined_script = await dialogue.generate_final_script()
+                final_script_elapsed = time.time() - final_script_start
+                logger.info(f"  Final script generated in {final_script_elapsed:.2f}s")
+                logger.info(f"  Final script word count: {len(refined_script.split())}")
+
+                # Validate and refine final script for runtime compliance
+                logger.info("  Validating final script runtime...")
+                yield f"data: {json.dumps({'type': 'validation_start', 'stage': 'stage4'})}\n\n"
+
+                final_script, final_compliance = await validate_and_refine_script(
+                    stage3_result['collaborators'][0],  # Use the author model
+                    refined_script,
+                    movie_length,
+                    request.content
+                )
+
+                logger.info(f"  Final script validation:")
+                logger.info(f"    Status: {final_compliance['status']}")
+                logger.info(f"    Word count: {final_compliance['word_count']}")
+                logger.info(f"    Estimated runtime: {final_compliance['estimated_runtime']} min")
+                if final_compliance.get('refinement_attempts', 0) > 0:
+                    logger.info(f"    Refinement attempts: {final_compliance['refinement_attempts']}")
+
+                yield f"data: {json.dumps({'type': 'validation_result', 'model': 'final_script', 'compliance': final_compliance})}\n\n"
+                yield f"data: {json.dumps({'type': 'validation_complete', 'stage': 'stage4'})}\n\n"
 
                 stage4_result = {
                     "dialogue_history": dialogue.dialogue_history,
-                    "refined_script": refined_script,
+                    "refined_script": final_script,
                     "collaborators": stage3_result['collaborators'],
-                    "num_turns": num_turns
+                    "num_turns": num_turns,
+                    "runtime_validation": final_compliance
                 }
 
+                stage4_elapsed = time.time() - stage4_start
+                logger.info(f"  Stage 4 completed in {stage4_elapsed:.2f}s")
                 yield f"data: {json.dumps({'type': 'stage4_complete', 'data': stage4_result})}\n\n"
             else:
+                logger.warning("  Not enough collaborators for Stage 4 dialogue")
                 yield f"data: {json.dumps({'type': 'stage4_complete', 'data': stage4_result})}\n\n"
 
             # Wait for title generation if it was started
             if title_task:
+                logger.info("Waiting for title generation to complete...")
                 title = await title_task
                 storage.update_conversation_title(conversation_id, title)
+                logger.info(f"Title generated: {title}")
                 yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
             # Save complete assistant message
+            logger.info("Saving complete assistant message to storage...")
             storage.add_movie_script_message(
                 conversation_id,
                 stage1_results,
@@ -437,9 +594,15 @@ async def send_movie_script_stream(conversation_id: str, request: MovieScriptReq
             )
 
             # Send completion event
+            workflow_elapsed = time.time() - workflow_start
+            logger.info("=" * 60)
+            logger.info("MOVIE SCRIPT WORKFLOW COMPLETED")
+            logger.info(f"  Total time: {workflow_elapsed:.2f}s")
+            logger.info("=" * 60)
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
         except Exception as e:
+            logger.exception(f"Error in movie script workflow: {e}")
             # Send error event
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 

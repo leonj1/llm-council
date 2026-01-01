@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any, Tuple
 from .openrouter import query_models_parallel, query_model
-from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .config import CHAIRMAN_MODEL, get_primary_models
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -18,7 +18,7 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     messages = [{"role": "user", "content": user_query}]
 
     # Query all models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(get_primary_models(), messages)
 
     # Format results
     stage1_results = []
@@ -95,7 +95,7 @@ Now provide your evaluation and ranking:"""
     messages = [{"role": "user", "content": ranking_prompt}]
 
     # Get rankings from all council models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(get_primary_models(), messages)
 
     # Format results
     stage2_results = []

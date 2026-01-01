@@ -93,13 +93,13 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (content, numTurns = 3) => {
+  const handleSendMessage = async (content, numTurns = 3, movieLength = 90) => {
     if (!currentConversationId || !currentConversation) return;
 
     const conversationType = currentConversation.type || 'council';
 
     if (conversationType === 'movie_script') {
-      await handleMovieScriptMessage(content, numTurns);
+      await handleMovieScriptMessage(content, numTurns, movieLength);
     } else {
       await handleCouncilMessage(content);
     }
@@ -161,6 +161,7 @@ function App() {
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.stage1 = false;
               lastMsg.loading.stage2 = true;
               return { ...prev, messages };
             });
@@ -181,6 +182,7 @@ function App() {
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.stage2 = false;
               lastMsg.loading.stage3 = true;
               return { ...prev, messages };
             });
@@ -189,9 +191,12 @@ function App() {
           case 'stage3_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage3 = event.data;
-              lastMsg.loading.stage3 = false;
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                stage3: event.data,
+                loading: { ...messages[lastIdx].loading, stage3: false }
+              };
               return { ...prev, messages };
             });
             break;
@@ -227,7 +232,7 @@ function App() {
     }
   };
 
-  const handleMovieScriptMessage = async (content, numTurns) => {
+  const handleMovieScriptMessage = async (content, numTurns, movieLength) => {
     setIsLoading(true);
     try {
       // Optimistically add user message to UI
@@ -260,13 +265,16 @@ function App() {
       }));
 
       // Send movie script request with streaming
-      await api.sendMovieScriptStream(currentConversationId, content, numTurns, (eventType, event) => {
+      await api.sendMovieScriptStream(currentConversationId, content, numTurns, movieLength, (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage1 = true;
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                loading: { ...messages[lastIdx].loading, stage1: true }
+              };
               return { ...prev, messages };
             });
             break;
@@ -274,9 +282,12 @@ function App() {
           case 'stage1_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage1 = event.data;
-              lastMsg.loading.stage1 = false;
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                stage1: event.data,
+                loading: { ...messages[lastIdx].loading, stage1: false }
+              };
               return { ...prev, messages };
             });
             break;
@@ -284,8 +295,11 @@ function App() {
           case 'stage2_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage2 = true;
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                loading: { ...messages[lastIdx].loading, stage1: false, stage2: true }
+              };
               return { ...prev, messages };
             });
             break;
@@ -293,10 +307,13 @@ function App() {
           case 'stage2_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage2 = event.data;
-              lastMsg.metadata = event.metadata;
-              lastMsg.loading.stage2 = false;
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                stage2: event.data,
+                metadata: event.metadata,
+                loading: { ...messages[lastIdx].loading, stage2: false }
+              };
               return { ...prev, messages };
             });
             break;
@@ -304,8 +321,11 @@ function App() {
           case 'stage3_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage3 = true;
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                loading: { ...messages[lastIdx].loading, stage2: false, stage3: true }
+              };
               return { ...prev, messages };
             });
             break;
@@ -313,9 +333,12 @@ function App() {
           case 'stage3_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage3 = event.data;
-              lastMsg.loading.stage3 = false;
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                stage3: event.data,
+                loading: { ...messages[lastIdx].loading, stage3: false }
+              };
               return { ...prev, messages };
             });
             break;
@@ -323,12 +346,15 @@ function App() {
           case 'stage4_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage4 = true;
-              lastMsg.stage4 = {
-                dialogue_history: [],
-                collaborators: event.data?.collaborators || [],
-                num_turns: event.data?.num_turns || numTurns,
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                loading: { ...messages[lastIdx].loading, stage3: false, stage4: true },
+                stage4: {
+                  dialogue_history: [],
+                  collaborators: event.data?.collaborators || [],
+                  num_turns: event.data?.num_turns || numTurns,
+                }
               };
               return { ...prev, messages };
             });
@@ -337,12 +363,19 @@ function App() {
           case 'stage4_turn':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
+              const lastIdx = messages.length - 1;
+              const lastMsg = messages[lastIdx];
               if (lastMsg.stage4) {
-                lastMsg.stage4.dialogue_history = [
-                  ...(lastMsg.stage4.dialogue_history || []),
-                  event.data,
-                ];
+                messages[lastIdx] = {
+                  ...lastMsg,
+                  stage4: {
+                    ...lastMsg.stage4,
+                    dialogue_history: [
+                      ...(lastMsg.stage4.dialogue_history || []),
+                      event.data,
+                    ]
+                  }
+                };
               }
               return { ...prev, messages };
             });
@@ -351,9 +384,84 @@ function App() {
           case 'stage4_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage4 = event.data;
-              lastMsg.loading.stage4 = false;
+              const lastIdx = messages.length - 1;
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                stage4: event.data,
+                loading: { ...messages[lastIdx].loading, stage4: false }
+              };
+              return { ...prev, messages };
+            });
+            // Stage 4 is the last visible content - hide loading indicator
+            setIsLoading(false);
+            break;
+
+          case 'validation_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastIdx = messages.length - 1;
+              const lastMsg = messages[lastIdx];
+              const newValidation = !lastMsg.validation
+                ? { stage: event.stage, inProgress: true, results: [] }
+                : { ...lastMsg.validation, stage: event.stage, inProgress: true };
+              messages[lastIdx] = {
+                ...lastMsg,
+                validation: newValidation
+              };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'validation_result':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastIdx = messages.length - 1;
+              let lastMsg = { ...messages[lastIdx] };
+
+              // Update validation results
+              if (lastMsg.validation) {
+                lastMsg.validation = {
+                  ...lastMsg.validation,
+                  results: [
+                    ...(lastMsg.validation.results || []),
+                    { model: event.model, compliance: event.compliance }
+                  ]
+                };
+              }
+
+              // Update stage1 with runtime validation info
+              if (lastMsg.stage1 && event.model !== 'final_script') {
+                lastMsg.stage1 = lastMsg.stage1.map(r =>
+                  r.model === event.model
+                    ? { ...r, runtime_validation: event.compliance }
+                    : r
+                );
+              }
+
+              // Update stage4 with runtime validation info
+              if (lastMsg.stage4 && event.model === 'final_script') {
+                lastMsg.stage4 = {
+                  ...lastMsg.stage4,
+                  runtime_validation: event.compliance
+                };
+              }
+
+              messages[lastIdx] = lastMsg;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'validation_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastIdx = messages.length - 1;
+              const lastMsg = messages[lastIdx];
+              if (lastMsg.validation) {
+                messages[lastIdx] = {
+                  ...lastMsg,
+                  validation: { ...lastMsg.validation, inProgress: false }
+                };
+              }
               return { ...prev, messages };
             });
             break;
