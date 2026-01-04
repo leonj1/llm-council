@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import Characters from './Characters';
 import './Stage4.css';
 
 export default function Stage4({ stage4Data, isLoading, onRegenerateFinalScript, isRegenerating }) {
@@ -161,6 +162,10 @@ export default function Stage4({ stage4Data, isLoading, onRegenerateFinalScript,
           </div>
         )}
       </div>
+
+      {refinedScript && refinedScript !== 'Unable to generate final script.' && (
+        <Characters scriptText={refinedScript} />
+      )}
 
       {refinedScript && (
         <div className="refined-script-section">

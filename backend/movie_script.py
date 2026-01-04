@@ -164,12 +164,24 @@ Please rewrite the COMPLETE script with the necessary adjustments to meet the {t
 **GENRE:**
 **RUNTIME:** {target_minutes} minutes
 
+**CHARACTERS:**
+(Keep the character descriptions - update if needed based on changes)
+
 **OUTLINE:**
 - ACT 1:
 - ACT 2:
 - ACT 3:
 
-**KEY SCENES:** (adjusted for {target_minutes}-minute runtime)"""
+**KEY SCENES:** (adjusted for {target_minutes}-minute runtime)
+
+**VISUAL NOTES:**
+(Keep or update transitions, B-roll suggestions, and camera directions)
+
+**CINEMATOGRAPHY:**
+(Keep or update camera equipment, lens/aperture, contrast ratio, color/look, frame rate per scene)
+
+**AUDIO NOTES:**
+(Keep or update score/music, sound effects, and ambient audio per scene)"""
 
     messages = [{"role": "user", "content": refinement_prompt}]
 
@@ -273,6 +285,18 @@ Provide your script in the following format:
 
 **RUNTIME:** {movie_length} minutes
 
+**CHARACTERS:**
+List each main character with:
+- **Name**: Character's name
+- **Appearance**: Detailed physical description including:
+  - Age and build (height, weight, body type)
+  - Facial features (jaw shape, nose, eyes, lips)
+  - Hair (color, style, texture - thinning, full, messy, slicked, overgrown, balding)
+  - Skin details (complexion, freckles, scars, blemishes, wrinkles, tattoos, birthmarks)
+  - Distinctive imperfections or unique features that make them memorable
+  - Typical clothing/style
+- **Personality**: Key personality traits, motivations, and behavioral characteristics
+
 **OUTLINE:**
 - ACT 1 (Setup): Key plot points
 - ACT 2 (Confrontation): Key plot points
@@ -282,6 +306,23 @@ Provide your script in the following format:
 - Scene heading (INT/EXT, LOCATION - TIME)
 - Action lines describing what happens
 - Character dialogue
+
+**VISUAL NOTES:**
+- **Transitions**: Key transition directions between major scenes (FADE IN, CUT TO, DISSOLVE TO, SMASH CUT, MATCH CUT, etc.)
+- **B-Roll Suggestions**: Supplemental footage for each act (establishing shots, detail inserts, atmospheric cutaways)
+- **Key Camera Directions**: Important shot types for pivotal moments (CLOSE-UP, WIDE SHOT, POV, TRACKING, etc.)
+
+**CINEMATOGRAPHY:** (For each key scene, specify)
+- **Camera**: Equipment type (e.g., "ARRI Alexa", "RED Komodo", "iPhone 15 Pro", "35mm Film", "Anamorphic lenses")
+- **Lens/Aperture**: Focal length and f-stop (e.g., "50mm at f/1.4 for shallow DOF", "24mm wide at f/8")
+- **Contrast Ratio**: Lighting contrast (e.g., "High contrast 8:1 for noir feel", "Low contrast 2:1 for soft daylight")
+- **Color/Look**: Color temperature and grade (e.g., "Warm tungsten 3200K", "Desaturated cold tones", "Teal and orange")
+- **Frame Rate**: Capture speed (e.g., "24fps standard", "48fps for smooth action", "120fps slow-motion")
+
+**AUDIO NOTES:** (For each key scene, include)
+- **Score/Music**: Musical style, mood, tempo (e.g., "Tense synth undertones", "Orchestral crescendo", "Silence for tension")
+- **Sound Effects**: Key SFX moments (e.g., "Gunshot echo", "Heartbeat intensifies", "Glass shattering")
+- **Ambient Audio**: Environmental soundscape (e.g., "City traffic hum", "Rain on windows", "Distant sirens")
 
 Format your response as a professional screenplay excerpt. Be creative and specific with your choices. Scale the complexity and number of scenes appropriately for the {movie_length}-minute runtime."""
 
@@ -678,12 +719,41 @@ Incorporate the best ideas from our dialogue. Present the complete refined scrip
 **GENRE:**
 **RUNTIME:** {self.movie_length} minutes
 
+**CHARACTERS:**
+List each main character with:
+- **Name**: Character's name
+- **Appearance**: Detailed physical description including:
+  - Age and build (height, weight, body type)
+  - Facial features (jaw shape, nose, eyes, lips)
+  - Hair (color, style, texture - thinning, full, messy, slicked, overgrown, balding)
+  - Skin details (complexion, freckles, scars, blemishes, wrinkles, tattoos, birthmarks)
+  - Distinctive imperfections or unique features that make them memorable
+  - Typical clothing/style
+- **Personality**: Key personality traits, motivations, and behavioral characteristics
+
 **REFINED OUTLINE:**
 - ACT 1:
 - ACT 2:
 - ACT 3:
 
 **KEY SCENES:** (Write out the improved/refined key scenes with proper formatting, appropriate for a {self.movie_length}-minute runtime)
+
+**VISUAL NOTES:**
+- **Transitions**: Key transition directions between major scenes (FADE IN, CUT TO, DISSOLVE TO, SMASH CUT, MATCH CUT, etc.)
+- **B-Roll Suggestions**: Supplemental footage for each act (establishing shots, detail inserts, atmospheric cutaways)
+- **Key Camera Directions**: Important shot types for pivotal moments (CLOSE-UP, WIDE SHOT, POV, TRACKING, etc.)
+
+**CINEMATOGRAPHY:** (For each key scene, specify)
+- **Camera**: Equipment type (e.g., "ARRI Alexa", "RED Komodo", "iPhone 15 Pro", "35mm Film", "Anamorphic lenses")
+- **Lens/Aperture**: Focal length and f-stop (e.g., "50mm at f/1.4 for shallow DOF", "24mm wide at f/8")
+- **Contrast Ratio**: Lighting contrast (e.g., "High contrast 8:1 for noir feel", "Low contrast 2:1 for soft daylight")
+- **Color/Look**: Color temperature and grade (e.g., "Warm tungsten 3200K", "Desaturated cold tones", "Teal and orange")
+- **Frame Rate**: Capture speed (e.g., "24fps standard", "48fps for smooth action", "120fps slow-motion")
+
+**AUDIO NOTES:** (For each key scene, include)
+- **Score/Music**: Musical style, mood, tempo (e.g., "Tense synth undertones", "Orchestral crescendo", "Silence for tension")
+- **Sound Effects**: Key SFX moments (e.g., "Gunshot echo", "Heartbeat intensifies", "Glass shattering")
+- **Ambient Audio**: Environmental soundscape (e.g., "City traffic hum", "Rain on windows", "Distant sirens")
 
 Make this the best version of the script, synthesizing our collaborative improvements for a {self.movie_length}-minute film."""
 
