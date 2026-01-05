@@ -1,5 +1,6 @@
 """Google OAuth authentication for the API."""
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Optional
@@ -8,6 +9,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.oauth2 import id_token
 from google.auth.transport import requests
+
+logger = logging.getLogger(__name__)
 
 # Get from environment
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -51,10 +54,11 @@ def verify_google_token(token: str) -> dict:
         )
         return idinfo
     except ValueError as e:
+        logger.error("Token verification failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {str(e)}"
-        )
+            detail="Invalid or expired token"
+        ) from e
 
 
 async def get_current_user(
