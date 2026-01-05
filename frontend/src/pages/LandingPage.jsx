@@ -1,9 +1,10 @@
+import { getApiBase } from '../api';
 import './LandingPage.css';
 
 function LandingPage() {
   const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth flow
-    console.log('Google login clicked');
+    const apiBase = getApiBase();
+    window.location.href = `${apiBase}/api/auth/google`;
   };
 
   return (

@@ -5,6 +5,8 @@
 // Use relative URLs for production, absolute for development
 const API_BASE = import.meta.env.DEV ? 'http://localhost:8004' : '';
 
+export const getApiBase = () => API_BASE;
+
 export const api = {
   /**
    * List all conversations.
