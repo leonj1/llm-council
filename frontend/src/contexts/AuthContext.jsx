@@ -73,6 +73,9 @@ export function AuthProvider({ children }) {
     setUser(userData);
 
     // Persist to localStorage
+    // NOTE: localStorage is vulnerable to XSS attacks. For a local dev tool this is
+    // acceptable, but production deployments should use httpOnly cookies instead.
+    // See: https://owasp.org/www-community/attacks/xss/
     localStorage.setItem('google_token', idToken);
     localStorage.setItem('user', JSON.stringify(userData));
   };
