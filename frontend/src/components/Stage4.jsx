@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import Markdown from './Markdown';
 import Characters from './Characters';
 import './Stage4.css';
 
@@ -139,7 +139,7 @@ export default function Stage4({ stage4Data, isLoading, onRegenerateFinalScript,
                   </div>
                   {isExpanded && (
                     <div className="entry-content markdown-content">
-                      <ReactMarkdown>{entry.message}</ReactMarkdown>
+                      <Markdown>{entry.message}</Markdown>
                     </div>
                   )}
                 </div>
@@ -217,7 +217,7 @@ export default function Stage4({ stage4Data, isLoading, onRegenerateFinalScript,
                 <span>Regenerating final script...</span>
               </div>
             ) : (
-              <ReactMarkdown>{refinedScript}</ReactMarkdown>
+              <Markdown>{refinedScript}</Markdown>
             )}
           </div>
         </div>

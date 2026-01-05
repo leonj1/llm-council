@@ -1,4 +1,4 @@
-import ReactMarkdown from 'react-markdown';
+import Markdown from './Markdown';
 import './Stage3MovieScript.css';
 
 export default function Stage3MovieScript({ selection }) {
@@ -24,7 +24,7 @@ export default function Stage3MovieScript({ selection }) {
       <div className="selection-rationale">
         <h4>Selection Rationale</h4>
         <div className="markdown-content">
-          <ReactMarkdown>{selection.selection_rationale}</ReactMarkdown>
+          <Markdown>{selection.selection_rationale}</Markdown>
         </div>
       </div>
 
@@ -48,7 +48,7 @@ export default function Stage3MovieScript({ selection }) {
       <details className="winning-script-details">
         <summary>View Winning Script</summary>
         <div className="winning-script-content markdown-content">
-          <ReactMarkdown>{selection.winning_script}</ReactMarkdown>
+          <Markdown>{selection.winning_script}</Markdown>
         </div>
       </details>
     </div>
