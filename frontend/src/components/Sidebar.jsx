@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -6,6 +5,8 @@ export default function Sidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  user,
+  onLogout,
 }) {
   return (
     <div className="sidebar">
@@ -38,6 +39,28 @@ export default function Sidebar({
           ))
         )}
       </div>
+
+      {user && (
+        <div className="sidebar-user">
+          <div className="user-info">
+            {user.picture && (
+              <img
+                src={user.picture}
+                alt={user.name}
+                className="user-avatar"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <div className="user-details">
+              <div className="user-name">{user.name}</div>
+              <div className="user-email">{user.email}</div>
+            </div>
+          </div>
+          <button className="logout-btn" onClick={onLogout}>
+            Logout
+          </button>
+        </div>
+      )}
     </div>
   );
 }

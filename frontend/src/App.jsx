@@ -1,26 +1,36 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import LoginPage from './components/LoginPage';
 import { api } from './api';
 import './App.css';
 
 function App() {
+  const { user, logout, isLoading: authLoading } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load conversations on mount
+  // Load conversations when user is authenticated
   useEffect(() => {
-    loadConversations();
-  }, []);
+    if (user) {
+      loadConversations();
+    } else {
+      // Clear conversations when logged out
+      setConversations([]);
+      setCurrentConversationId(null);
+      setCurrentConversation(null);
+    }
+  }, [user]);
 
   // Load conversation details when selected
   useEffect(() => {
-    if (currentConversationId) {
+    if (currentConversationId && user) {
       loadConversation(currentConversationId);
     }
-  }, [currentConversationId]);
+  }, [currentConversationId, user]);
 
   const loadConversations = async () => {
     try {
@@ -28,6 +38,7 @@ function App() {
       setConversations(convs);
     } catch (error) {
       console.error('Failed to load conversations:', error);
+      // If unauthorized, the api module will handle logout
     }
   };
 
@@ -181,6 +192,21 @@ function App() {
     }
   };
 
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="app-loading">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  // Show main app when authenticated
   return (
     <div className="app">
       <Sidebar
@@ -188,6 +214,8 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        user={user}
+        onLogout={logout}
       />
       <ChatInterface
         conversation={currentConversation}

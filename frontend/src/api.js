@@ -4,12 +4,38 @@
 
 const API_BASE = 'http://localhost:8001';
 
+/**
+ * Get auth headers from localStorage.
+ */
+function getAuthHeaders() {
+  const token = localStorage.getItem('google_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Handle unauthorized responses by clearing auth and reloading.
+ */
+function handleUnauthorized(response) {
+  if (response.status === 401) {
+    localStorage.removeItem('google_token');
+    localStorage.removeItem('user');
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
+
 export const api = {
   /**
    * List all conversations.
    */
   async listConversations() {
-    const response = await fetch(`${API_BASE}/api/conversations`);
+    const response = await fetch(`${API_BASE}/api/conversations`, {
+      headers: {
+        ...getAuthHeaders(),
+      },
+    });
+    if (handleUnauthorized(response)) return [];
     if (!response.ok) {
       throw new Error('Failed to list conversations');
     }
@@ -24,9 +50,11 @@ export const api = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({}),
     });
+    if (handleUnauthorized(response)) return null;
     if (!response.ok) {
       throw new Error('Failed to create conversation');
     }
@@ -38,8 +66,14 @@ export const api = {
    */
   async getConversation(conversationId) {
     const response = await fetch(
-      `${API_BASE}/api/conversations/${conversationId}`
+      `${API_BASE}/api/conversations/${conversationId}`,
+      {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      }
     );
+    if (handleUnauthorized(response)) return null;
     if (!response.ok) {
       throw new Error('Failed to get conversation');
     }
@@ -56,10 +90,12 @@ export const api = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ content }),
       }
     );
+    if (handleUnauthorized(response)) return null;
     if (!response.ok) {
       throw new Error('Failed to send message');
     }
@@ -80,11 +116,13 @@ export const api = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ content }),
       }
     );
 
+    if (handleUnauthorized(response)) return;
     if (!response.ok) {
       throw new Error('Failed to send message');
     }
@@ -111,5 +149,21 @@ export const api = {
         }
       }
     }
+  },
+
+  /**
+   * Get current user info (validates token).
+   */
+  async getMe() {
+    const response = await fetch(`${API_BASE}/api/me`, {
+      headers: {
+        ...getAuthHeaders(),
+      },
+    });
+    if (handleUnauthorized(response)) return null;
+    if (!response.ok) {
+      throw new Error('Failed to get user info');
+    }
+    return response.json();
   },
 };
