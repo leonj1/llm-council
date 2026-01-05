@@ -1,5 +1,12 @@
 {
     "hooks": {
+        "SessionEnd": [
+            {
+                "type": "command",
+                "command": "python3 .claude/scripts/agent-summary.py",
+                "timeout": 10000
+            }
+        ],
         "UserPromptSubmit": [
             {
                 "type": "command",
