@@ -1,0 +1,19 @@
+=== Session 20260105-045500 ===
+Workflow: architect
+Task: Create a landing page with Hello World label at "/" and move chat to different route
+Status: Initialized
+Context: React 19 + Vite frontend, Python FastAPI backend. Currently no routing - all in App.jsx. Need to add react-router-dom.
+Tech Stack:
+  - Frontend: React 19, Vite 7, ReactMarkdown
+  - Backend: Python FastAPI on port 8004
+  - No current routing library installed
+Key Files:
+  - /root/repo/frontend/src/App.jsx (main app, contains all chat logic)
+  - /root/repo/frontend/src/main.jsx (entry point)
+  - /root/repo/frontend/src/components/ (Sidebar, ChatInterface, Stage1-4)
+
+Artifacts:
+  - /root/repo/specs/DRAFT-landing-page-hello-world.md
+
+Next: Architect spec created, ready for implementation
+---
