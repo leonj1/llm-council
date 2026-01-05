@@ -200,70 +200,68 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {conversation.messages.length === 0 && (
-        <form className="input-form" onSubmit={handleSubmit}>
-          <textarea
-            className="message-input"
-            placeholder={
-              isMovieScript
-                ? 'Describe your movie idea... (e.g., "A sci-fi thriller about AI becoming sentient")'
-                : 'Ask your question... (Shift+Enter for new line, Enter to send)'
-            }
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            rows={3}
-          />
+      <form className="input-form" onSubmit={handleSubmit}>
+        <textarea
+          className="message-input"
+          placeholder={
+            isMovieScript
+              ? 'Describe your movie idea... (e.g., "A sci-fi thriller about AI becoming sentient")'
+              : 'Ask your question... (Shift+Enter for new line, Enter to send)'
+          }
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isLoading}
+          rows={3}
+        />
 
-          {isMovieScript && (
-            <div className="movie-script-options">
-              <div className="movie-length-select">
-                <label htmlFor="length-input">Movie length:</label>
-                <select
-                  id="length-input"
-                  value={movieLength}
-                  onChange={(e) => setMovieLength(parseInt(e.target.value, 10))}
-                  disabled={isLoading}
-                >
-                  {movieLengthOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+        {isMovieScript && (
+          <div className="movie-script-options">
+            <div className="movie-length-select">
+              <label htmlFor="length-input">Movie length:</label>
+              <select
+                id="length-input"
+                value={movieLength}
+                onChange={(e) => setMovieLength(parseInt(e.target.value, 10))}
+                disabled={isLoading}
+              >
+                {movieLengthOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              <div className="turns-slider">
-                <label htmlFor="turns-input">
-                  Collaboration turns: <strong>{numTurns}</strong>
-                </label>
-                <input
-                  id="turns-input"
-                  type="range"
-                  min="1"
-                  max="7"
-                  value={numTurns}
-                  onChange={(e) => setNumTurns(parseInt(e.target.value, 10))}
-                  disabled={isLoading}
-                />
-                <div className="turns-labels">
-                  <span>1</span>
-                  <span>7</span>
-                </div>
+            <div className="turns-slider">
+              <label htmlFor="turns-input">
+                Collaboration turns: <strong>{numTurns}</strong>
+              </label>
+              <input
+                id="turns-input"
+                type="range"
+                min="1"
+                max="7"
+                value={numTurns}
+                onChange={(e) => setNumTurns(parseInt(e.target.value, 10))}
+                disabled={isLoading}
+              />
+              <div className="turns-labels">
+                <span>1</span>
+                <span>7</span>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          <button
-            type="submit"
-            className="send-button"
-            disabled={!input.trim() || isLoading}
-          >
-            {isMovieScript ? 'Generate Script' : 'Send'}
-          </button>
-        </form>
-      )}
+        <button
+          type="submit"
+          className="send-button"
+          disabled={!input.trim() || isLoading}
+        >
+          {isMovieScript ? 'Generate Script' : 'Send'}
+        </button>
+      </form>
     </div>
   );
 }

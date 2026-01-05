@@ -5,17 +5,27 @@ from .openrouter import query_models_parallel, query_model
 from .config import CHAIRMAN_MODEL, get_primary_models
 
 
-async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
+async def stage1_collect_responses(user_query: str, conversation_history: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
     Args:
         user_query: The user's question
+        conversation_history: Optional list of previous exchanges (user queries + council final responses)
 
     Returns:
         List of dicts with 'model' and 'response' keys
     """
-    messages = [{"role": "user", "content": user_query}]
+    messages = []
+
+    # Include conversation history if provided
+    if conversation_history:
+        for exchange in conversation_history:
+            messages.append({"role": "user", "content": exchange["user_query"]})
+            messages.append({"role": "assistant", "content": exchange["final_response"]})
+
+    # Add current query
+    messages.append({"role": "user", "content": user_query})
 
     # Query all models in parallel
     responses = await query_models_parallel(get_primary_models(), messages)
@@ -293,18 +303,19 @@ Title:"""
     return title
 
 
-async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
+async def run_full_council(user_query: str, conversation_history: List[Dict[str, Any]] = None) -> Tuple[List, List, Dict, Dict]:
     """
     Run the complete 3-stage council process.
 
     Args:
         user_query: The user's question
+        conversation_history: Optional list of previous exchanges (user queries + council final responses)
 
     Returns:
         Tuple of (stage1_results, stage2_results, stage3_result, metadata)
     """
     # Stage 1: Collect individual responses
-    stage1_results = await stage1_collect_responses(user_query)
+    stage1_results = await stage1_collect_responses(user_query, conversation_history)
 
     # If no models responded successfully, return error
     if not stage1_results:
