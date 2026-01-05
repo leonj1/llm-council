@@ -86,6 +86,13 @@ async def get_current_user(
 
     claims = verify_google_token(credentials.credentials)
 
+    # Validate email claim is present (requires email scope in OAuth flow)
+    if 'email' not in claims:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing email claim (email scope required)"
+        )
+
     return User(
         id=claims['sub'],  # Stable user ID from Google
         email=claims['email'],

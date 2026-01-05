@@ -8,8 +8,22 @@ from pathlib import Path
 from .config import DATA_DIR
 
 
+def validate_user_id(user_id: str) -> bool:
+    """
+    Validate user_id format matches Google OAuth 'sub' claim requirements.
+
+    Google's 'sub' claim is a numeric string up to 255 characters.
+    We allow alphanumeric plus common safe characters as defense-in-depth.
+    """
+    if not user_id or len(user_id) > 255:
+        return False
+    return all(c.isalnum() or c in '-_.' for c in user_id)
+
+
 def get_user_dir(user_id: str) -> str:
     """Get the directory for a user's conversations."""
+    if not validate_user_id(user_id):
+        raise ValueError(f"Invalid user_id format")
     return os.path.join(DATA_DIR, user_id)
 
 
@@ -86,6 +100,10 @@ def save_conversation(conversation: Dict[str, Any], user_id: str):
         conversation: Conversation dict to save
         user_id: User's Google 'sub' identifier
     """
+    # Validate ownership before saving
+    if conversation.get('user_id') != user_id:
+        raise ValueError("Cannot save conversation owned by different user")
+
     ensure_user_dir(user_id)
 
     path = get_conversation_path(conversation['id'], user_id)
