@@ -1,0 +1,22 @@
+.landing-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.landing-page h1 {
+  font-size: 4rem;
+  color: white;
+  font-weight: 700;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  margin: 0;
+  padding: 2rem;
+}
+
+@media (max-width: 768px) {
+  .landing-page h1 {
+    font-size: 2.5rem;
+  }
+}

@@ -1,0 +1,16 @@
+# Feature List Example
+
+This is an example template for `feature_list.md`. Copy this file to `feature_list.md` and customize.
+
+## Features
+
+- [ ] Feature 1: Description of first feature
+- [ ] Feature 2: Description of second feature
+- [ ] Feature 3: Description of third feature
+
+## Rules
+
+1. Only modify checkbox status `[ ]` to `[x]` when feature is verified working
+2. Never edit or remove feature descriptions
+3. Work on one feature at a time
+4. Mark complete only after testing confirms functionality
