@@ -14,7 +14,9 @@ export const api = {
   async listConversations() {
     const response = await fetch(`${API_BASE}/api/conversations`);
     if (!response.ok) {
-      throw new Error('Failed to list conversations');
+      const error = new Error('Failed to list conversations');
+      error.status = response.status;
+      throw error;
     }
     return response.json();
   },
@@ -45,7 +47,9 @@ export const api = {
       `${API_BASE}/api/conversations/${conversationId}`
     );
     if (!response.ok) {
-      throw new Error('Failed to get conversation');
+      const error = new Error('Failed to get conversation');
+      error.status = response.status;
+      throw error;
     }
     return response.json();
   },

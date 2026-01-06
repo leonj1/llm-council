@@ -1,30 +1,38 @@
-# BDD Specification: Chat URL Routing with Authentication
+# BDD Specification: Chat URL Routing (Frontend)
 
 ## Overview
 
-This specification covers the chat URL routing feature that enables:
-1. URL synchronization with selected conversations
-2. Direct navigation to conversations via URL
-3. Conversation ownership and access control
+This specification covers the frontend implementation of chat URL routing:
+1. React Router route for `/chat/:conversationId`
+2. URL synchronization with conversation selection
+3. Browser history navigation support
+4. Auth guards and error handling
+
+## Sub-Task Scope
+
+**From Root Request:** Chat URL Routing (Frontend)
+
+**Implementation Focus:**
+- Add React Router route for `/chat/:conversationId`
+- Update `App.jsx` to read `conversationId` from URL params
+- Update `Sidebar.jsx` to use `navigate()` instead of callback
 
 ## User Stories
 
 - As an authenticated user, I want the URL to reflect the currently selected chat so that I can bookmark and share specific conversations
 - As an authenticated user, I want to navigate directly to a conversation via URL so that I can quickly access bookmarked chats
-- As an authenticated user, I want my conversations to be private so that other users cannot access my chat history
 
 ## Feature Files
 
 | Feature File | Scenarios | Coverage |
 |--------------|-----------|----------|
 | chat-url-routing.feature | 11 | URL navigation, browser history, edge cases, auth |
-| conversation-ownership.feature | 6 | Ownership assignment, validation, error cases |
 
 ## Scenarios Summary
 
 ### chat-url-routing.feature
 
-**Happy Paths:**
+**Happy Paths (URL Navigation):**
 1. URL updates when selecting a chat from sidebar
 2. Navigate directly to a chat via URL
 3. Create new conversation updates URL
@@ -34,51 +42,68 @@ This specification covers the chat URL routing feature that enables:
 **Edge Cases:**
 6. Navigate to base chat URL with no conversation selected
 7. Navigate to URL for non-existent conversation
-8. Conversation list filtered to current user only
+8. Conversation list filtered to current user only (backend-driven)
 
 **Authentication/Authorization:**
 9. Access denied when viewing another user's conversation
 10. Unauthenticated user redirected from chat URL
 11. Unauthenticated user redirected from base chat page
 
-### conversation-ownership.feature
+## Frontend Implementation Mapping
 
-**Ownership Assignment:**
-1. New conversation is assigned to creating user
-
-**Ownership Validation:**
-2. Successfully retrieve my own conversation
-3. Cannot retrieve conversation owned by another user
-4. Cannot list conversations owned by other users
-
-**Error Cases:**
-5. Request non-existent conversation returns not found
-6. Request conversation without authentication returns unauthorized
+| Scenario | Component | Change Required |
+|----------|-----------|-----------------|
+| 1 | Sidebar.jsx | Use `navigate('/chat/{id}')` on selection |
+| 2 | main.jsx, App.jsx | Add route param, use `useParams()` |
+| 3 | App.jsx | `navigate('/chat/{newId}')` after create |
+| 4-5 | React Router | Handled automatically with proper routing |
+| 6 | App.jsx | Handle missing param gracefully |
+| 7 | App.jsx | Handle 404 response, show error message |
+| 8 | API layer | Backend filters (no frontend change) |
+| 9 | App.jsx | Handle 403 response, redirect + message |
+| 10-11 | main.jsx | ProtectedRoute wrapper or auth check |
 
 ## Acceptance Criteria
 
-### URL Routing
-- [ ] Selecting a chat in sidebar updates URL to `/chat/{conversationId}`
-- [ ] Navigating directly to `/chat/{conversationId}` loads that chat
-- [ ] New conversation creation navigates to `/chat/{newId}`
-- [ ] Browser back/forward buttons work correctly with chat selection
+### URL Routing (Frontend)
+- [ ] Route `/chat/:conversationId` defined in main.jsx
+- [ ] App.jsx reads `conversationId` via `useParams()`
+- [ ] Sidebar uses `navigate()` for conversation selection
+- [ ] New conversation creation calls `navigate('/chat/{newId}')`
+- [ ] Browser back/forward buttons work with chat navigation
 - [ ] Base `/chat` URL shows no conversation selected
 
-### Ownership & Access Control
-- [ ] Navigating to another user's chat returns 403 and redirects to /chat
-- [ ] Conversation list only shows authenticated user's conversations
-- [ ] Non-existent conversation returns 404 and redirects to /chat
-- [ ] Unauthenticated access redirects to landing page
+### Error Handling (Frontend)
+- [ ] 404 response redirects to `/chat` with "Not found" message
+- [ ] 403 response redirects to `/chat` with "Access denied" message
+- [ ] Unauthenticated access redirects to `/` (landing page)
 
-### Data Model
-- [ ] Conversations have `user_id` field for ownership tracking
-- [ ] Backend validates ownership on all conversation endpoints
+## Current State Analysis
+
+**main.jsx:**
+- Has `/chat` route but no `:conversationId` param
+- Uses BrowserRouter with Routes
+
+**App.jsx:**
+- Uses `useState` for `currentConversationId`
+- `handleSelectConversation(id)` sets state only
+- No URL param reading
+
+**Sidebar.jsx:**
+- Uses `onSelectConversation` callback prop
+- No direct navigation
 
 ## Error Handling Matrix
 
-| Scenario | Expected Behavior |
-|----------|-------------------|
-| Valid conversation, owned by user | Load chat |
-| Conversation not found | Redirect to /chat, show "Not found" |
-| Conversation owned by other user | Redirect to /chat, show "Access denied" |
-| Not authenticated | Redirect to "/" (landing) |
+| API Response | Frontend Behavior |
+|--------------|-------------------|
+| 200 OK | Load and display conversation |
+| 404 Not Found | Redirect to /chat, show "Not found" toast |
+| 403 Forbidden | Redirect to /chat, show "Access denied" toast |
+| 401 Unauthorized | Redirect to / (landing page) |
+
+## Ready For
+
+- gherkin-to-test agent
+- test-creator agent
+- coder agent
