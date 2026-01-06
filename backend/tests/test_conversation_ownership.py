@@ -55,8 +55,7 @@ def cleanup_conversations():
     """Clean up all conversations after each test"""
     yield
     # Delete all conversation files
-    import os
-    from backend.config import DATA_DIR
+    from ..config import DATA_DIR
     from pathlib import Path
     data_path = Path(DATA_DIR)
     if data_path.exists():
