@@ -1,6 +1,27 @@
 #!/bin/bash
 set -e
 
+# Run Flyway migrations if database is configured
+if [ -n "$MYSQL_HOST" ] && [ -n "$MYSQL_DATABASE" ]; then
+    echo "Running Flyway migrations..."
+
+    # Build Flyway JDBC URL
+    FLYWAY_URL="jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT:-3306}/${MYSQL_DATABASE}"
+
+    # Run Flyway migrate
+    flyway \
+        -url="${FLYWAY_URL}" \
+        -user="${MYSQL_USER:-root}" \
+        -password="${MYSQL_PASSWORD:-}" \
+        -locations="filesystem:/app/sql" \
+        -connectRetries=5 \
+        migrate
+
+    echo "Flyway migrations completed."
+else
+    echo "Database not configured (MYSQL_HOST or MYSQL_DATABASE not set). Skipping Flyway migrations."
+fi
+
 # Check if we can run Tailscale (need /dev/net/tun)
 if [ -e /dev/net/tun ] && [ -n "$TS_AUTHKEY" ]; then
     echo "Starting Tailscale daemon..."

@@ -7,6 +7,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 import httpx
 
+from .database import upsert_user
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # Google OAuth configuration
@@ -87,12 +89,28 @@ async def google_callback(code: str = None, state: str = None, error: str = None
 
         user_info = userinfo_response.json()
 
+    # Persist user to database
+    google_id = user_info.get("id")
+    email = user_info.get("email")
+    name = user_info.get("name")
+    picture = user_info.get("picture")
+
+    db_user = upsert_user(
+        google_id=google_id,
+        email=email,
+        name=name,
+        picture_url=picture,
+    )
+    if db_user:
+        print(f"User persisted to database: {email} (id={db_user['id']})")
+
     # Create session
     session_id = secrets.token_urlsafe(32)
     sessions[session_id] = {
-        "email": user_info.get("email"),
-        "name": user_info.get("name"),
-        "picture": user_info.get("picture"),
+        "email": email,
+        "name": name,
+        "picture": picture,
+        "user_id": db_user["id"] if db_user else None,
     }
 
     # Redirect to frontend with session

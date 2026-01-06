@@ -21,13 +21,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies and Tailscale
+# Install system dependencies, Tailscale, tini, and Flyway
 RUN apt-get update && apt-get install -y \
     curl \
     iptables \
     ca-certificates \
+    tini \
+    default-jre-headless \
     && curl -fsSL https://tailscale.com/install.sh | sh \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Flyway
+RUN curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/10.6.0/flyway-commandline-10.6.0-linux-x64.tar.gz -o /tmp/flyway.tar.gz \
+    && tar -xzf /tmp/flyway.tar.gz -C /opt \
+    && ln -s /opt/flyway-10.6.0/flyway /usr/local/bin/flyway \
+    && rm /tmp/flyway.tar.gz
 
 # Copy Python dependencies specification
 COPY pyproject.toml uv.lock* ./
@@ -41,6 +49,9 @@ RUN uv pip install --system --no-cache -r pyproject.toml
 # Copy backend code
 COPY backend/ ./backend/
 COPY main.py ./
+
+# Copy SQL migrations for Flyway
+COPY sql/ ./sql/
 
 # Copy built frontend from previous stage
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
@@ -59,5 +70,5 @@ ENV PORT=8004
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Run via entrypoint script (handles Tailscale + app)
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Run via tini entrypoint (handles Flyway + Tailscale + app)
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker-entrypoint.sh"]
