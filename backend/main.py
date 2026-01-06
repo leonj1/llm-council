@@ -681,7 +681,19 @@ async def send_movie_script_stream(conversation_id: str, request: MovieScriptReq
 # Mount static files for frontend (if available)
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
+    from fastapi.responses import FileResponse
+
+    # Serve static assets (js, css, images, etc.)
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+
+    # SPA catch-all: serve index.html for any non-API route
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Serve index.html for client-side routing
+        index_path = frontend_dist / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path)
+        raise HTTPException(status_code=404, detail="Not Found")
 
 
 if __name__ == "__main__":
