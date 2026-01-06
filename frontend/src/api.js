@@ -12,7 +12,9 @@ export const api = {
    * List all conversations.
    */
   async listConversations() {
-    const response = await fetch(`${API_BASE}/api/conversations`);
+    const response = await fetch(`${API_BASE}/api/conversations`, {
+      credentials: 'include',
+    });
     if (!response.ok) {
       const error = new Error('Failed to list conversations');
       error.status = response.status;
@@ -31,6 +33,7 @@ export const api = {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({ type }),
     });
     if (!response.ok) {
@@ -44,7 +47,8 @@ export const api = {
    */
   async getConversation(conversationId) {
     const response = await fetch(
-      `${API_BASE}/api/conversations/${conversationId}`
+      `${API_BASE}/api/conversations/${conversationId}`,
+      { credentials: 'include' }
     );
     if (!response.ok) {
       const error = new Error('Failed to get conversation');
@@ -62,6 +66,7 @@ export const api = {
       `${API_BASE}/api/conversations/${conversationId}`,
       {
         method: 'DELETE',
+        credentials: 'include',
       }
     );
     if (!response.ok) {
@@ -81,6 +86,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ content }),
       }
     );
@@ -105,6 +111,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ content }),
       }
     );
@@ -169,6 +176,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ content, num_turns: numTurns, movie_length: movieLength }),
       }
     );
@@ -229,6 +237,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       }
     );
 
