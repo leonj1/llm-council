@@ -1,7 +1,7 @@
 === Session 20260105-045500 ===
 Workflow: architect
 Task: Create a landing page with Hello World label at "/" and move chat to different route
-Status: Initialized
+Status: Completed
 Context: React 19 + Vite frontend, Python FastAPI backend. Currently no routing - all in App.jsx. Need to add react-router-dom.
 Tech Stack:
   - Frontend: React 19, Vite 7, ReactMarkdown
@@ -16,4 +16,37 @@ Artifacts:
   - /root/repo/specs/DRAFT-landing-page-hello-world.md
 
 Next: Architect spec created, ready for implementation
+---
+
+=== Session 20260106-025859 ===
+Workflow: architect
+Task: Implement user chat persistence in MySQL based on BDD test
+Status: Initialized
+Context: LLM Council app with existing user auth (Google OAuth), users table in MySQL, JSON-based storage.py. BDD feature file exists at tests/bdd/user-chat-persistence.feature.
+
+Tech Stack:
+  - Frontend: React 19, Vite 7, ReactMarkdown
+  - Backend: Python FastAPI on port 8004
+  - Database: MySQL with Flyway migrations
+  - Auth: Google OAuth with session cookies
+
+Key Files:
+  - /root/repo/backend/storage.py (current JSON storage - needs MySQL migration)
+  - /root/repo/backend/database.py (MySQL connection, user persistence)
+  - /root/repo/backend/auth.py (Google OAuth, session management)
+  - /root/repo/backend/main.py (API endpoints)
+  - /root/repo/sql/V1__create_users_table.sql (existing migration)
+  - /root/repo/tests/bdd/user-chat-persistence.feature (BDD scenarios)
+
+Existing Database:
+  - users table: id, google_id, email, name, picture_url, created_at, updated_at
+
+Required Changes:
+  1. Create chats table (id, user_id FK, title, type, created_at)
+  2. Create messages table (id, chat_id FK, role, content, stage1, stage2, stage3, created_at)
+  3. Update storage.py to use MySQL instead of JSON
+  4. Update API endpoints to filter by authenticated user
+  5. Add authorization checks for chat access
+
+Next: Invoking architect agent
 ---
