@@ -10,9 +10,9 @@ Feature: Conversation Ownership
 
 import pytest
 from fastapi.testclient import TestClient
-from backend.main import app
-from backend.auth import sessions
-from backend import storage
+from ..main import app
+from ..auth import sessions
+from .. import storage
 
 
 client = TestClient(app)
