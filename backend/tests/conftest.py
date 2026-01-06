@@ -3,6 +3,7 @@ Pytest configuration and fixtures for LLM Council tests.
 """
 
 import pytest
+from mysql.connector import Error
 from ..database import get_connection
 
 
@@ -21,10 +22,13 @@ def cleanup_database():
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             connection.commit()
             cursor.close()
-        except Exception as e:
+        except Error as e:
             print(f"Warning: Could not clean up database: {e}")
+            connection.rollback()
         finally:
             connection.close()
+    else:
+        pytest.fail("Database connection unavailable - cannot ensure test isolation")
     yield
 
 
