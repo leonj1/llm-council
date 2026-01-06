@@ -2,19 +2,41 @@
 > Status: In Progress
 
 ## Root Request
-"Create a landing page with a 'Hello World' label that displays when the browser routes to '/' instead of the chat page. Keep the existing chat page accessible at a different route. Do not delete any existing code."
+"Implement user chat persistence in MySQL based on the BDD test in tests/bdd/user-chat-persistence.feature. The feature requires: 1) Creating database tables for chats and messages linked to users, 2) Updating storage.py to use MySQL instead of JSON files, 3) Adding user_id foreign key to associate chats with authenticated users, 4) Updating API endpoints to filter chats by authenticated user, 5) Ensuring all LLM responses (Stage 1, 2, 3) are persisted and retrievable from the database, 6) Authorization checks so users can only access their own chats."
 
 ## Active Stack
-1. Create landing page with Hello World and routing (In Progress)
-   - Spec: /root/repo/specs/DRAFT-landing-page-hello-world.md
+1. User Chat Persistence in MySQL (Decomposed)
+   - BDD Test: /root/repo/tests/bdd/user-chat-persistence.feature
 
 ### Decomposition Justification for Task 1
 | Sub-Task | Traces To Root Term | Because |
 |----------|---------------------|---------|
-| Add react-router-dom | "routes to" | Enables client-side routing |
-| Create LandingPage.jsx | "landing page", "Hello World label" | New component at "/" |
-| Wrap App with BrowserRouter | "routes to /" | Provides routing context |
-| Add Routes in App.jsx | "different route" | Defines "/" and "/chat" paths |
+| 1.1 Chats table schema | "Creating database tables for chats...linked to users", "user_id foreign key" | Foundation for chat persistence with user association |
+| 1.2 Messages table schema | "Creating database tables for...messages", "Stage 1, 2, 3...persisted" | Stores conversation content including LLM stages |
+| 1.3 Storage layer migration | "Updating storage.py to use MySQL instead of JSON files", "retrievable from database" | Replaces file-based storage with MySQL-backed functions |
+| 1.4 API authorization | "filter chats by authenticated user", "Authorization checks so users can only access their own chats" | Endpoint security and user isolation |
+
+   1.1 Database Schema - Chats Table (Completed)
+       - V2 migration for `chats` table with user_id FK
+       - Basic CRUD for chats in database.py
+       - Scenarios: Create chat, retrieve chat, user isolation (3)
+
+   1.2 Database Schema - Messages Table (Completed)
+       - V3 migration for `messages` table with chat_id FK
+       - Message CRUD with stage1/2/3 JSON storage
+       - Scenarios: Store/retrieve user msg, store/retrieve assistant msg (3)
+
+   1.3 Storage Layer Migration (In Progress)
+       - chat_storage.py with MySQL-backed functions
+       - Replace JSON file ops with MySQL calls
+       - Scenarios: Query persistence, stage retrieval (4)
+
+   1.4 API Authorization (Pending)
+       - Update main.py endpoints for auth + user filtering
+       - Authorization checks for chat access
+       - Scenarios: Auth required, cross-user forbidden, delete auth (4)
 
 ## Completed
-(empty)
+- [x] Create landing page with Hello World and routing
+- [x] 1.1 Database Schema - Chats Table
+- [x] 1.2 Database Schema - Messages Table
