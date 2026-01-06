@@ -1,0 +1,51 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies including mysql client for wait script
+RUN apt-get update && apt-get install -y \
+    curl \
+    default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python dependencies specification
+COPY pyproject.toml ./
+
+# Install uv for faster Python package installation
+RUN pip install --no-cache-dir uv
+
+# Install Python dependencies including test dependencies
+RUN uv pip install --system --no-cache -r pyproject.toml
+RUN uv pip install --system --no-cache pytest pytest-asyncio pytest-timeout aiohttp
+
+# Copy backend code and tests
+COPY backend/ ./backend/
+
+# Copy pytest configuration
+COPY pytest.ini ./
+
+# Set environment variables for MySQL connection
+ENV PYTHONUNBUFFERED=1
+ENV MYSQL_HOST=mysql-test
+ENV MYSQL_PORT=3306
+ENV MYSQL_USER=root
+ENV MYSQL_PASSWORD=testpass
+ENV MYSQL_DATABASE=llm_council
+
+# Create entrypoint script that waits for MySQL
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Waiting for MySQL to be ready..."\n\
+for i in {1..30}; do\n\
+  if mysqladmin ping -h"$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --silent 2>/dev/null; then\n\
+    echo "MySQL is ready!"\n\
+    break\n\
+  fi\n\
+  echo "Waiting for MySQL... attempt $i/30"\n\
+  sleep 2\n\
+done\n\
+exec python -m pytest backend/tests/ -v --ignore=backend/tests/test_movie_script_integration.py\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+# Run tests via entrypoint
+CMD ["/app/entrypoint.sh"]
