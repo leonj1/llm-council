@@ -15,8 +15,8 @@
 
 ## Completed
 - [x] Create landing page with Hello World and routing
-- [x] 1.1 Database Schema - Chats Table (user chat persistence)
-- [x] 1.2 Database Schema - Messages Table (user chat persistence)
+- [x] Prereq: Database Schema - Chats Table (user chat persistence)
+- [x] Prereq: Database Schema - Messages Table (user chat persistence)
 - [x] 1.1 Conversation Ownership Validation
     - Added user_id field to conversation storage
     - Added require_auth dependency for authentication
