@@ -145,3 +145,23 @@ async def logout(request: Request):
     response = RedirectResponse(url=FRONTEND_URL)
     response.delete_cookie("session_id")
     return response
+
+
+async def require_auth(request: Request) -> dict:
+    """
+    FastAPI dependency to require authentication.
+
+    Extracts session_id from cookie and returns the user dict from session store.
+    Raises 401 HTTPException if session is missing or invalid.
+
+    Returns:
+        dict: User session data containing email, name, picture, and user_id
+
+    Raises:
+        HTTPException: 401 if not authenticated
+    """
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in sessions:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    return sessions[session_id]

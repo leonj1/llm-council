@@ -18,12 +18,13 @@ def get_conversation_path(conversation_id: str) -> str:
     return os.path.join(DATA_DIR, f"{conversation_id}.json")
 
 
-def create_conversation(conversation_id: str, conversation_type: str = "council") -> Dict[str, Any]:
+def create_conversation(conversation_id: str, user_id: int, conversation_type: str = "council") -> Dict[str, Any]:
     """
     Create a new conversation.
 
     Args:
         conversation_id: Unique identifier for the conversation
+        user_id: ID of the user who owns this conversation
         conversation_type: Type of conversation ("council" or "movie_script")
 
     Returns:
@@ -33,6 +34,7 @@ def create_conversation(conversation_id: str, conversation_type: str = "council"
 
     conversation = {
         "id": conversation_id,
+        "user_id": user_id,
         "created_at": datetime.utcnow().isoformat(),
         "title": "New Conversation",
         "type": conversation_type,
@@ -99,9 +101,12 @@ def delete_conversation(conversation_id: str) -> bool:
     return True
 
 
-def list_conversations() -> List[Dict[str, Any]]:
+def list_conversations(user_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """
-    List all conversations (metadata only).
+    List conversations (metadata only), optionally filtered by user_id.
+
+    Args:
+        user_id: If provided, only return conversations owned by this user
 
     Returns:
         List of conversation metadata dicts
@@ -114,6 +119,11 @@ def list_conversations() -> List[Dict[str, Any]]:
             path = os.path.join(DATA_DIR, filename)
             with open(path, 'r') as f:
                 data = json.load(f)
+
+                # Filter by user_id if provided
+                if user_id is not None and data.get("user_id") != user_id:
+                    continue
+
                 # Return metadata only
                 conversations.append({
                     "id": data["id"],
