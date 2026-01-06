@@ -126,9 +126,12 @@ def test_successfully_retrieve_my_own_conversation(alice_session):
     data = response.json()
     assert data["id"] == conversation_id
 
-    # And: The response includes all messages (user message + possibly assistant response)
-    assert len(data["messages"]) >= 1
+    # And: The response includes the user message and assistant response
+    # Note: In test environment, LLM calls fail but system still adds an error response
+    assert len(data["messages"]) == 2
+    assert data["messages"][0]["role"] == "user"
     assert data["messages"][0]["content"] == "Hello world"
+    assert data["messages"][1]["role"] == "assistant"
 
 
 @pytest.mark.unit
