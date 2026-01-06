@@ -16,12 +16,12 @@
 | 1.3 Storage layer migration | "Updating storage.py to use MySQL instead of JSON files", "retrievable from database" | Replaces file-based storage with MySQL-backed functions |
 | 1.4 API authorization | "filter chats by authenticated user", "Authorization checks so users can only access their own chats" | Endpoint security and user isolation |
 
-   1.1 Database Schema - Chats Table (In Progress)
+   1.1 Database Schema - Chats Table (Completed)
        - V2 migration for `chats` table with user_id FK
        - Basic CRUD for chats in database.py
        - Scenarios: Create chat, retrieve chat, user isolation (3)
 
-   1.2 Database Schema - Messages Table (Pending)
+   1.2 Database Schema - Messages Table (In Progress)
        - V3 migration for `messages` table with chat_id FK
        - Message CRUD with stage1/2/3 JSON storage
        - Scenarios: Store/retrieve user msg, store/retrieve assistant msg (3)
@@ -38,3 +38,4 @@
 
 ## Completed
 - [x] Create landing page with Hello World and routing
+- [x] 1.1 Database Schema - Chats Table

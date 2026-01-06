@@ -1,9 +1,10 @@
 """MySQL database connection and user persistence for LLM Council."""
 
 import os
+import uuid
 import mysql.connector
 from mysql.connector import Error
-from typing import Optional
+from typing import Optional, List
 from contextlib import contextmanager
 
 # Database configuration from environment
@@ -119,5 +120,65 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
         cursor.execute(
             "SELECT id, google_id, email, name, picture_url, created_at, updated_at FROM users WHERE id = %s",
             (user_id,)
+        )
+        return cursor.fetchone()
+
+
+def create_chat(user_id: int) -> Optional[dict]:
+    """
+    Create a new chat for the given user.
+    Returns the created chat record if successful, None otherwise.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            print("Warning: Database not available, skipping chat creation")
+            return None
+
+        # Generate UUID for chat id
+        chat_id = str(uuid.uuid4())
+
+        # Insert new chat
+        cursor.execute(
+            "INSERT INTO chats (id, user_id) VALUES (%s, %s)",
+            (chat_id, user_id)
+        )
+
+        # Fetch created record
+        cursor.execute(
+            "SELECT id, user_id, created_at FROM chats WHERE id = %s",
+            (chat_id,)
+        )
+        return cursor.fetchone()
+
+
+def get_chats_by_user_id(user_id: int) -> List[dict]:
+    """
+    Get all chats for the given user.
+    Returns a list of chat records, empty list if none found or database unavailable.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            return []
+
+        cursor.execute(
+            "SELECT id, user_id, created_at FROM chats WHERE user_id = %s ORDER BY created_at DESC",
+            (user_id,)
+        )
+        result = cursor.fetchall()
+        return result if result else []
+
+
+def get_chat_by_id(chat_id: str) -> Optional[dict]:
+    """
+    Get a single chat by ID.
+    Returns the chat record if found, None otherwise.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            return None
+
+        cursor.execute(
+            "SELECT id, user_id, created_at FROM chats WHERE id = %s",
+            (chat_id,)
         )
         return cursor.fetchone()
