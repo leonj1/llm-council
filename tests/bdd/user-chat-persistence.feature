@@ -96,6 +96,29 @@ Feature: User Chat Persistence
     And each fetched chat has a message count
     And all fetched chats belong to user "alice@example.com"
 
+  Scenario: New user has empty chat list
+    Given a user is authenticated with email "newuser@example.com"
+    And the user has not created any chats
+    When the user fetches their chat list from the database
+    Then the fetched chat list is empty
+    And no error is returned
+
+  # Chat Management
+
+  Scenario: User deletes their own chat
+    Given a user is authenticated with email "alice@example.com"
+    And the user has created a chat with messages
+    When the user deletes the chat
+    And the user fetches their chat list from the database
+    Then the fetched chat list does not contain the deleted chat
+    And the deleted chat messages are also removed
+
+  Scenario: User cannot delete another user's chat
+    Given user "alice@example.com" has created a chat with id "chat-456"
+    When user "bob@example.com" attempts to delete chat "chat-456"
+    Then the response is a forbidden error
+    And the chat remains in the database for "alice@example.com"
+
   # Session Persistence Verification
 
   Scenario: User retrieves same chat data after re-authentication
