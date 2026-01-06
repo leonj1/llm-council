@@ -30,4 +30,13 @@ stop:
 # Restart the container
 restart: stop start
 
-.PHONY: build start stop restart
+# Run tests in Docker containers
+test:
+	@echo "Starting test environment..."
+	docker compose -f docker-compose.test.yml down -v --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.test.yml build test-runner
+	docker compose -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from test-runner
+	@echo "Cleaning up test environment..."
+	docker compose -f docker-compose.test.yml down -v --remove-orphans
+
+.PHONY: build start stop restart test

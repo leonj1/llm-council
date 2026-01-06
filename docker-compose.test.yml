@@ -16,3 +16,18 @@ services:
       retries: 10
     tmpfs:
       - /var/lib/mysql
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: llm-council-test-runner
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql-test
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: testpass
+      MYSQL_DATABASE: llm_council

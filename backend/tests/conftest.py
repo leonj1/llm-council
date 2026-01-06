@@ -3,6 +3,29 @@ Pytest configuration and fixtures for LLM Council tests.
 """
 
 import pytest
+from backend.database import get_connection
+
+
+@pytest.fixture(autouse=True)
+def cleanup_database():
+    """Clean up database tables before each test for isolation."""
+    connection = get_connection()
+    if connection:
+        try:
+            cursor = connection.cursor()
+            # Disable foreign key checks to allow truncation
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+            cursor.execute("TRUNCATE TABLE messages")
+            cursor.execute("TRUNCATE TABLE chats")
+            cursor.execute("TRUNCATE TABLE users")
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            connection.commit()
+            cursor.close()
+        except Exception as e:
+            print(f"Warning: Could not clean up database: {e}")
+        finally:
+            connection.close()
+    yield
 
 
 def pytest_configure(config):
