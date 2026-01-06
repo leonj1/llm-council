@@ -21,12 +21,12 @@
        - Basic CRUD for chats in database.py
        - Scenarios: Create chat, retrieve chat, user isolation (3)
 
-   1.2 Database Schema - Messages Table (In Progress)
+   1.2 Database Schema - Messages Table (Completed)
        - V3 migration for `messages` table with chat_id FK
        - Message CRUD with stage1/2/3 JSON storage
        - Scenarios: Store/retrieve user msg, store/retrieve assistant msg (3)
 
-   1.3 Storage Layer Migration (Pending)
+   1.3 Storage Layer Migration (In Progress)
        - chat_storage.py with MySQL-backed functions
        - Replace JSON file ops with MySQL calls
        - Scenarios: Query persistence, stage retrieval (4)
@@ -39,3 +39,4 @@
 ## Completed
 - [x] Create landing page with Hello World and routing
 - [x] 1.1 Database Schema - Chats Table
+- [x] 1.2 Database Schema - Messages Table

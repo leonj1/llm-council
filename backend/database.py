@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import json
 import mysql.connector
 from mysql.connector import Error
 from typing import Optional, List
@@ -182,3 +183,164 @@ def get_chat_by_id(chat_id: str) -> Optional[dict]:
             (chat_id,)
         )
         return cursor.fetchone()
+
+
+def create_message(
+    chat_id: str,
+    role: str,
+    content: str,
+    stage1_data: Optional[dict],
+    stage2_data: Optional[dict],
+    stage3_data: Optional[dict]
+) -> Optional[dict]:
+    """
+    Create a new message for the given chat.
+
+    Args:
+        chat_id: UUID of the chat
+        role: 'user' or 'assistant'
+        content: Message text content
+        stage1_data: Stage 1 data (model responses) - JSON serializable dict or None
+        stage2_data: Stage 2 data (rankings) - JSON serializable dict or None
+        stage3_data: Stage 3 data (synthesis) - JSON serializable dict or None
+
+    Returns the created message record if successful, None otherwise.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            print("Warning: Database not available, skipping message creation")
+            return None
+
+        # Insert new message with JSON serialization for stage data
+        cursor.execute(
+            """
+            INSERT INTO messages (chat_id, role, content, stage1_data, stage2_data, stage3_data)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                chat_id,
+                role,
+                content,
+                json.dumps(stage1_data) if stage1_data else None,
+                json.dumps(stage2_data) if stage2_data else None,
+                json.dumps(stage3_data) if stage3_data else None
+            )
+        )
+
+        message_id = cursor.lastrowid
+
+        # Fetch created record
+        cursor.execute(
+            """
+            SELECT id, chat_id, role, content, stage1_data, stage2_data, stage3_data, created_at
+            FROM messages WHERE id = %s
+            """,
+            (message_id,)
+        )
+        message = cursor.fetchone()
+
+        # Deserialize JSON fields
+        if message:
+            if message['stage1_data']:
+                message['stage1_data'] = json.loads(message['stage1_data'])
+            if message['stage2_data']:
+                message['stage2_data'] = json.loads(message['stage2_data'])
+            if message['stage3_data']:
+                message['stage3_data'] = json.loads(message['stage3_data'])
+
+        return message
+
+
+def get_messages_by_chat_id(chat_id: str) -> List[dict]:
+    """
+    Get all messages for the given chat in chronological order.
+
+    Args:
+        chat_id: UUID of the chat
+
+    Returns a list of message records ordered by created_at ascending, empty list if none found or database unavailable.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            return []
+
+        cursor.execute(
+            """
+            SELECT id, chat_id, role, content, stage1_data, stage2_data, stage3_data, created_at
+            FROM messages
+            WHERE chat_id = %s
+            ORDER BY created_at ASC
+            """,
+            (chat_id,)
+        )
+        messages = cursor.fetchall()
+
+        # Deserialize JSON fields for each message
+        if messages:
+            for message in messages:
+                if message['stage1_data']:
+                    message['stage1_data'] = json.loads(message['stage1_data'])
+                if message['stage2_data']:
+                    message['stage2_data'] = json.loads(message['stage2_data'])
+                if message['stage3_data']:
+                    message['stage3_data'] = json.loads(message['stage3_data'])
+
+        return messages if messages else []
+
+
+def get_message_by_id(message_id: int) -> Optional[dict]:
+    """
+    Get a single message by ID.
+
+    Args:
+        message_id: Integer ID of the message
+
+    Returns the message record if found with deserialized JSON fields, None otherwise.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            return None
+
+        cursor.execute(
+            """
+            SELECT id, chat_id, role, content, stage1_data, stage2_data, stage3_data, created_at
+            FROM messages WHERE id = %s
+            """,
+            (message_id,)
+        )
+        message = cursor.fetchone()
+
+        # Deserialize JSON fields
+        if message:
+            if message['stage1_data']:
+                message['stage1_data'] = json.loads(message['stage1_data'])
+            if message['stage2_data']:
+                message['stage2_data'] = json.loads(message['stage2_data'])
+            if message['stage3_data']:
+                message['stage3_data'] = json.loads(message['stage3_data'])
+
+        return message
+
+
+def delete_chat(chat_id: str) -> bool:
+    """
+    Delete a chat by ID.
+    Messages are automatically cascade-deleted via foreign key constraint.
+
+    Args:
+        chat_id: UUID of the chat to delete
+
+    Returns True if chat was deleted, False otherwise.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            print("Warning: Database not available, skipping chat deletion")
+            return False
+
+        cursor.execute(
+            "DELETE FROM chats WHERE id = %s",
+            (chat_id,)
+        )
+
+        # Check if any rows were affected
+        return cursor.rowcount > 0
