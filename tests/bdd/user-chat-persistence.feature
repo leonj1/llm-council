@@ -7,117 +7,120 @@ Feature: User Chat Persistence
     Given the application is running
     And the database is available
 
-  # Chat Creation and Ownership
+  # Chat Creation and Retrieval
 
-  Scenario: Authenticated user creates a chat that is assigned to them
+  Scenario: User creates a chat and retrieves it from the database
     Given a user is authenticated with email "alice@example.com"
     When the user creates a new chat
-    Then the chat is persisted in the database
-    And the chat is assigned to user "alice@example.com"
-    And the chat has a unique identifier
-    And the chat has a creation timestamp
+    And the user fetches their chat list from the database
+    Then the fetched chat list contains the newly created chat
+    And the fetched chat has the user ID matching "alice@example.com"
+    And the fetched chat has a unique identifier
+    And the fetched chat has a creation timestamp
 
-  Scenario: Chat is only visible to the user who created it
-    Given a user is authenticated with email "alice@example.com"
-    And the user has created a chat
-    When a different user with email "bob@example.com" lists their chats
-    Then the chat created by "alice@example.com" is not visible to "bob@example.com"
+  Scenario: User's chat is not returned when another user queries the database
+    Given a user "alice@example.com" has created a chat
+    When user "bob@example.com" fetches their chat list from the database
+    Then the fetched chat list does not contain chats from "alice@example.com"
 
-  # Query Submission and Persistence
+  # Query Submission and Retrieval
 
-  Scenario: User submits a query and it is persisted
+  Scenario: User submits a query and retrieves it from the database
     Given a user is authenticated with email "alice@example.com"
     And the user has created a chat
     When the user submits a query "What is the meaning of life?"
-    Then the query is persisted in the database
-    And the query is associated with the chat
-    And the query has a timestamp
-    And the query content matches "What is the meaning of life?"
+    And the user fetches the chat messages from the database
+    Then the fetched messages contain a user message
+    And the fetched user message content equals "What is the meaning of life?"
+    And the fetched user message has a timestamp
 
-  # LLM Response Persistence
+  # LLM Response Retrieval
 
-  Scenario: LLM responses from Stage 1 are persisted
+  Scenario: Stage 1 LLM responses are retrieved from the database
     Given a user is authenticated with email "alice@example.com"
     And the user has created a chat
     When the user submits a query "Explain quantum computing"
     And the council models respond with Stage 1 responses
-    Then all Stage 1 responses are persisted in the database
-    And each Stage 1 response includes the model identifier
-    And each Stage 1 response includes the response content
+    And the user fetches the chat messages from the database
+    Then the fetched assistant message contains Stage 1 data
+    And the fetched Stage 1 data contains responses from multiple models
+    And each fetched Stage 1 response has a model identifier
+    And each fetched Stage 1 response has response content
 
-  Scenario: LLM rankings from Stage 2 are persisted
+  Scenario: Stage 2 rankings are retrieved from the database
     Given a user is authenticated with email "alice@example.com"
     And the user has created a chat
     When the user submits a query "Explain quantum computing"
     And the council completes Stage 2 rankings
-    Then all Stage 2 rankings are persisted in the database
-    And each ranking includes the evaluating model
-    And each ranking includes the parsed ranking order
+    And the user fetches the chat messages from the database
+    Then the fetched assistant message contains Stage 2 data
+    And the fetched Stage 2 data contains rankings from multiple models
+    And each fetched Stage 2 ranking has an evaluating model
+    And each fetched Stage 2 ranking has a parsed ranking order
 
-  Scenario: Final synthesis from Stage 3 is persisted
+  Scenario: Stage 3 synthesis is retrieved from the database
     Given a user is authenticated with email "alice@example.com"
     And the user has created a chat
     When the user submits a query "Explain quantum computing"
     And the chairman model synthesizes the final response
-    Then the Stage 3 response is persisted in the database
-    And the response includes the chairman model identifier
-    And the response includes the synthesized content
+    And the user fetches the chat messages from the database
+    Then the fetched assistant message contains Stage 3 data
+    And the fetched Stage 3 data has the chairman model identifier
+    And the fetched Stage 3 data has the synthesized response content
 
-  # Full Conversation Flow
+  # Complete Conversation Retrieval
 
-  Scenario: Complete conversation with multiple exchanges is persisted
+  Scenario: Multiple exchanges are retrieved from the database in order
     Given a user is authenticated with email "alice@example.com"
     And the user has created a chat
     When the user submits a query "What is machine learning?"
     And the council processes the query through all stages
     And the user submits a follow-up query "How does it differ from deep learning?"
     And the council processes the follow-up through all stages
-    Then the chat contains two user messages
-    And the chat contains two assistant responses
-    And each assistant response has Stage 1, Stage 2, and Stage 3 data
-    And all data is persisted in the database
+    And the user fetches the chat messages from the database
+    Then the fetched messages contain exactly 4 messages
+    And the fetched message at index 0 is a user message with content "What is machine learning?"
+    And the fetched message at index 1 is an assistant message with Stage 1, Stage 2, and Stage 3 data
+    And the fetched message at index 2 is a user message with content "How does it differ from deep learning?"
+    And the fetched message at index 3 is an assistant message with Stage 1, Stage 2, and Stage 3 data
 
-  # Data Retrieval
+  # Chat List Retrieval
 
-  Scenario: User can retrieve their chat history
+  Scenario: User retrieves all their chats with metadata from the database
     Given a user is authenticated with email "alice@example.com"
-    And the user has multiple chats with conversations
-    When the user requests their chat list
-    Then all chats belonging to the user are returned
-    And each chat includes its title
-    And each chat includes its creation timestamp
-    And each chat includes the message count
+    And the user has created 3 chats with conversations
+    When the user fetches their chat list from the database
+    Then the fetched chat list contains exactly 3 chats
+    And each fetched chat has a title
+    And each fetched chat has a creation timestamp
+    And each fetched chat has a message count
+    And all fetched chats belong to user "alice@example.com"
 
-  Scenario: User can retrieve full conversation from a chat
+  # Session Persistence Verification
+
+  Scenario: User retrieves same chat data after re-authentication
     Given a user is authenticated with email "alice@example.com"
-    And the user has a chat with completed conversations
-    When the user requests the full chat details
-    Then all messages in the chat are returned
-    And user messages include the query content
-    And assistant messages include all stage data
-    And the conversation order is preserved
+    And the user has created a chat with a query "Test persistence query"
+    And the council has responded with all stages
+    When the user session ends
+    And the user authenticates again with email "alice@example.com"
+    And the user fetches their chat list from the database
+    And the user fetches the chat messages from the database
+    Then the fetched user message content equals "Test persistence query"
+    And the fetched assistant message contains Stage 1, Stage 2, and Stage 3 data
 
-  # Session Continuity
+  # Authorization - Data Isolation
 
-  Scenario: User chats persist across sessions
-    Given a user is authenticated with email "alice@example.com"
-    And the user has created chats and conversations
-    When the user logs out
-    And the user logs back in with email "alice@example.com"
-    Then the user can access all their previous chats
-    And all conversation data is intact
-
-  # Authorization
-
-  Scenario: Unauthenticated user cannot create chats
+  Scenario: Unauthenticated request returns no user chats
     Given a user is not authenticated
-    When the user attempts to create a chat
-    Then the request is rejected with an authentication error
-    And no chat is created in the database
+    When an unauthenticated request fetches chats from the database
+    Then the response is an authentication error
+    And no chat data is returned
 
-  Scenario: User cannot access another user's chat by ID
-    Given a user is authenticated with email "alice@example.com"
-    And "alice@example.com" has created a chat with id "chat-123"
-    When a user authenticated as "bob@example.com" attempts to access "chat-123"
-    Then the request is rejected with a forbidden error
-    And the chat data is not returned
+  Scenario: User cannot fetch another user's chat data by ID
+    Given user "alice@example.com" has created a chat with id "chat-123"
+    And user "alice@example.com" has submitted a query "Alice's private question"
+    When user "bob@example.com" attempts to fetch chat "chat-123" from the database
+    Then the response is a forbidden error
+    And no chat messages are returned
+    And "Alice's private question" is not exposed to "bob@example.com"
