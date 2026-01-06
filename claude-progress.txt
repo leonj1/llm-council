@@ -50,3 +50,45 @@ Required Changes:
 
 Next: Invoking architect agent
 ---
+
+=== Session 20260106-214008 ===
+Workflow: architect
+Task: Implement chat URL routing where selecting a chat updates URL to /chat/{conversationId} and navigating to /chat/{conversationId} opens that specific chat only if it belongs to the authenticated user
+Status: Initialized
+
+Context: LLM Council app with existing routing (react-router-dom v7), Google OAuth auth, MySQL database with users/chats/messages tables. Current /chat route shows all chats without URL-based selection.
+
+Tech Stack:
+  - Frontend: React 19, Vite 7, react-router-dom 7.11.0
+  - Backend: Python FastAPI on port 8004
+  - Database: MySQL with Flyway migrations (V1-V3)
+  - Auth: Google OAuth with session cookies, in-memory session store
+
+Key Files:
+  - /root/repo/frontend/src/main.jsx (BrowserRouter, Routes at "/" and "/chat")
+  - /root/repo/frontend/src/App.jsx (chat logic, state management)
+  - /root/repo/frontend/src/components/Sidebar.jsx (conversation list, selection)
+  - /root/repo/frontend/src/api.js (API client)
+  - /root/repo/backend/main.py (FastAPI endpoints)
+  - /root/repo/backend/storage.py (JSON-based storage)
+  - /root/repo/backend/database.py (MySQL CRUD for chats/messages)
+  - /root/repo/backend/auth.py (Google OAuth, sessions dict with user_id)
+
+Existing Database Schema:
+  - users: id, google_id, email, name, picture_url, created_at, updated_at
+  - chats: id (UUID), user_id (FK), created_at
+  - messages: id, chat_id (FK), role, content, stage1_data, stage2_data, stage3_data, created_at
+
+Required Changes:
+  1. Add React Router route for /chat/:conversationId (main.jsx)
+  2. Update App.jsx to read conversationId from URL params, sync selection with URL
+  3. Update Sidebar to use navigate() instead of just state update
+  4. Add user_id to conversation storage (already in chats table)
+  5. Validate ownership in GET /api/conversations/{id} (return 403 if not owner)
+  6. Filter conversation list by authenticated user
+
+Active Task from architects_digest.md: 1.4 API Authorization (Pending)
+
+Next: Invoking architect agent
+---
+
