@@ -3,7 +3,7 @@ Pytest configuration and fixtures for LLM Council tests.
 """
 
 import pytest
-from backend.database import get_connection
+from ..database import get_connection
 
 
 @pytest.fixture(autouse=True)
