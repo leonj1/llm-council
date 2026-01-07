@@ -8,24 +8,26 @@ from mysql.connector import Error
 from typing import Optional, List
 from contextlib import contextmanager
 
-# Database configuration from environment
-DB_HOST = os.getenv("MYSQL_HOST", "localhost")
-DB_PORT = int(os.getenv("MYSQL_PORT", "3306"))
-DB_USER = os.getenv("MYSQL_USER", "root")
-DB_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-DB_NAME = os.getenv("MYSQL_DATABASE", "llm_council")
+def _get_db_config():
+    """Get database configuration from environment at runtime.
+
+    Railway uses DB_* vars, local dev may use MYSQL_* vars.
+    Reading at runtime ensures env vars are available after container starts.
+    """
+    return {
+        "host": os.getenv("DB_HOST") or os.getenv("MYSQL_HOST", "localhost"),
+        "port": int(os.getenv("DB_PORT") or os.getenv("MYSQL_PORT", "3306")),
+        "user": os.getenv("DB_USER") or os.getenv("MYSQL_USER", "root"),
+        "password": os.getenv("DB_PASSWORD") or os.getenv("MYSQL_PASSWORD", ""),
+        "database": os.getenv("DB_NAME") or os.getenv("MYSQL_DATABASE", "llm_council"),
+    }
 
 
 def get_connection():
     """Create and return a MySQL connection."""
     try:
-        connection = mysql.connector.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-        )
+        config = _get_db_config()
+        connection = mysql.connector.connect(**config)
         return connection
     except Error as e:
         print(f"Error connecting to MySQL: {e}")
