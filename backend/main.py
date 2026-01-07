@@ -92,6 +92,20 @@ async def root():
     return {"status": "ok", "service": "LLM Council API"}
 
 
+@app.get("/api/health/db")
+async def database_health():
+    """Database connection health check endpoint."""
+    from .database import get_connection
+    try:
+        connection = get_connection()
+        if connection is not None:
+            connection.close()
+            return {"connected": True}
+        return {"connected": False}
+    except Exception:
+        return {"connected": False}
+
+
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
 async def list_conversations(user: dict = Depends(require_auth)):
     """List conversations for the authenticated user (metadata only)."""

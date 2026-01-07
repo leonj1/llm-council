@@ -1,0 +1,54 @@
+.db-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.db-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.db-status-connected {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.db-status-connected .db-status-dot {
+  background: #4caf50;
+  box-shadow: 0 0 4px #4caf50;
+}
+
+.db-status-disconnected {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.db-status-disconnected .db-status-dot {
+  background: #f44336;
+  box-shadow: 0 0 4px #f44336;
+}
+
+.db-status-checking {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.db-status-checking .db-status-dot {
+  background: #ff9800;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
