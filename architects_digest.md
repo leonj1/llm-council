@@ -1,42 +1,32 @@
 # Architect's Digest
-> Status: In Progress
+> Status: Complete
 
 ## Root Request
-"Implement user chat persistence in MySQL based on the BDD test in tests/bdd/user-chat-persistence.feature. The feature requires: 1) Creating database tables for chats and messages linked to users, 2) Updating storage.py to use MySQL instead of JSON files, 3) Adding user_id foreign key to associate chats with authenticated users, 4) Updating API endpoints to filter chats by authenticated user, 5) Ensuring all LLM responses (Stage 1, 2, 3) are persisted and retrievable from the database, 6) Authorization checks so users can only access their own chats."
+"Implement chat URL routing where selecting a chat updates URL to /chat/{conversationId} and navigating to /chat/{conversationId} opens that specific chat only if it belongs to the authenticated user. Requirements: 1) Add React Router route for /chat/:conversationId 2) Update App.jsx to read conversationId from URL params and navigate on selection 3) Update Sidebar to use navigate() 4) Add user_id to conversation storage 5) Validate ownership in GET /api/conversations/{id} 6) Filter conversation list by authenticated user"
 
 ## Active Stack
-1. User Chat Persistence in MySQL (Decomposed)
-   - BDD Test: /root/repo/tests/bdd/user-chat-persistence.feature
+1. Chat URL Routing with Auth (Decomposed)
 
 ### Decomposition Justification for Task 1
 | Sub-Task | Traces To Root Term | Because |
 |----------|---------------------|---------|
-| 1.1 Chats table schema | "Creating database tables for chats...linked to users", "user_id foreign key" | Foundation for chat persistence with user association |
-| 1.2 Messages table schema | "Creating database tables for...messages", "Stage 1, 2, 3...persisted" | Stores conversation content including LLM stages |
-| 1.3 Storage layer migration | "Updating storage.py to use MySQL instead of JSON files", "retrievable from database" | Replaces file-based storage with MySQL-backed functions |
-| 1.4 API authorization | "filter chats by authenticated user", "Authorization checks so users can only access their own chats" | Endpoint security and user isolation |
-
-   1.1 Database Schema - Chats Table (Completed)
-       - V2 migration for `chats` table with user_id FK
-       - Basic CRUD for chats in database.py
-       - Scenarios: Create chat, retrieve chat, user isolation (3)
-
-   1.2 Database Schema - Messages Table (Completed)
-       - V3 migration for `messages` table with chat_id FK
-       - Message CRUD with stage1/2/3 JSON storage
-       - Scenarios: Store/retrieve user msg, store/retrieve assistant msg (3)
-
-   1.3 Storage Layer Migration (In Progress)
-       - chat_storage.py with MySQL-backed functions
-       - Replace JSON file ops with MySQL calls
-       - Scenarios: Query persistence, stage retrieval (4)
-
-   1.4 API Authorization (Pending)
-       - Update main.py endpoints for auth + user filtering
-       - Authorization checks for chat access
-       - Scenarios: Auth required, cross-user forbidden, delete auth (4)
+| 1.1 Conversation Ownership Validation | "Add user_id to conversation storage", "Validate ownership in GET /api/conversations/{id}", "only if it belongs to the authenticated user", "Filter conversation list by authenticated user" | Backend foundation: storage must track ownership before frontend can route to owned chats |
+| 1.2 Chat URL Routing | "Add React Router route for /chat/:conversationId", "Update App.jsx to read conversationId from URL params", "Update Sidebar to use navigate()" | Frontend: URL-based chat selection (depends on 1.1 for ownership enforcement) |
 
 ## Completed
 - [x] Create landing page with Hello World and routing
-- [x] 1.1 Database Schema - Chats Table
-- [x] 1.2 Database Schema - Messages Table
+- [x] Prereq: Database Schema - Chats Table (user chat persistence)
+- [x] Prereq: Database Schema - Messages Table (user chat persistence)
+- [x] 1.1 Conversation Ownership Validation
+    - Added user_id field to conversation storage
+    - Added require_auth dependency for authentication
+    - Validate ownership in GET /api/conversations/{id} (403 if not owner)
+    - Filter GET /api/conversations by authenticated user_id
+    - DELETE endpoint checks ownership
+    - 8 tests passing in test_conversation_ownership.py
+- [x] 1.2 Chat URL Routing
+    - Added /chat/:conversationId route to main.jsx
+    - App.jsx reads useParams(), syncs with currentConversationId
+    - Sidebar uses navigate() for selection
+    - Handles 403/404 errors with redirect to /chat
+    - Error banner UI with dismiss button

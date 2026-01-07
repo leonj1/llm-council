@@ -1,84 +1,87 @@
-# Gap Analysis: Messages Table Schema
+# Gap Analysis: Conversation Ownership Validation
 
 ## Analysis Date: 2026-01-06
 
 ## Executive Summary
-Extend database layer to support messages table with chat association and JSON stage data. All existing patterns can be reused. V2 (chats table) dependency is complete.
+Add ownership tracking and validation to conversation endpoints. User must only access their own conversations. Existing auth patterns (sessions, get_current_user) can be reused. Storage layer needs user_id field.
 
 ## Root Request Trace
-> "Creating database tables for...messages", "Stage 1, 2, 3...persisted and retrievable from the database"
+> "Add user_id to conversation storage", "Validate ownership in GET /api/conversations/{id}", "Filter conversation list by authenticated user"
 
 ## Existing Code to Reuse
 
-### 1. Database Layer (`backend/database.py`)
+### 1. Authentication Layer (`backend/auth.py`)
+| Component | Purpose | Reuse |
+|-----------|---------|-------|
+| `sessions: dict` | In-memory session store | Direct reuse |
+| `get_current_user()` | Extract user from session cookie | Convert to dependency |
+| `@router.get("/me")` | Returns user info from session | Pattern for auth checks |
+
+**Pattern**: Session cookie `session_id` maps to user dict in `sessions`
+
+### 2. Database Layer (`backend/database.py`)
 | Function | Purpose | Reuse |
 |----------|---------|-------|
-| `get_connection()` | MySQL connection factory | Direct reuse |
-| `get_db_cursor()` | Context manager with auto-commit/rollback | Direct reuse |
-| `get_user_by_email()` | Find user by email | Use in tests |
-| `create_chat()` | Create chat for user | Use in tests |
-| `get_chat_by_id()` | Fetch single chat | Use for validation |
+| `get_chat_by_id()` | Returns chat with `user_id` | Pattern for ownership check |
+| `get_chats_by_user_id()` | Filter by user | Pattern for list filtering |
+| `create_chat(user_id)` | Associates chat with user | Pattern for creation |
 
-**Pattern**: All functions return `Optional[dict]` with dictionary cursor
-
-### 2. Existing Schema
-| Migration | Table | Status |
-|-----------|-------|--------|
-| V1 | users | Complete |
-| V2 | chats | Complete |
-
-### 3. V2 Schema (`sql/V2__create_chats_table.sql`)
-| Element | Value | Relevance |
-|---------|-------|-----------|
-| `chats.id` | VARCHAR(36) PRIMARY KEY | Foreign key target for messages |
-| `ON DELETE CASCADE` | FK pattern | Reuse for messages->chats |
-| Engine | InnoDB | Required for FK |
-| Charset | utf8mb4 | Consistency |
+### 3. Storage Layer (`backend/storage.py`)
+| Function | Purpose | Modification Needed |
+|----------|---------|---------------------|
+| `create_conversation()` | Creates new conversation | Add `user_id` param |
+| `get_conversation()` | Load single conversation | No change (check ownership in main.py) |
+| `list_conversations()` | List all conversations | Add `user_id` filter param |
 
 ## Similar Patterns Already Implemented
 
-| Existing Pattern | New (Messages) Equivalent |
-|------------------|---------------------------|
-| `create_chat(user_id)` | `create_message(chat_id, role, content, stage1, stage2, stage3)` |
-| `get_chat_by_id(chat_id)` | `get_message_by_id(message_id)` |
-| `get_chats_by_user_id(user_id)` | `get_messages_by_chat_id(chat_id)` |
+| Existing Pattern | New Equivalent |
+|------------------|----------------|
+| `get_chats_by_user_id(user_id)` | `list_conversations(user_id)` |
+| `get_chat_by_id() -> {user_id}` | `get_conversation() -> {user_id}` |
+| `auth.get_current_user()` | FastAPI Dependency for endpoints |
 
 ## Code Needing Refactoring
 
-**None** - existing code follows standards and can be extended directly
+**None** - Extend existing patterns, no breaking changes
 
 ## New Components to Build
 
-### 1. Flyway Migration: `sql/V3__create_messages_table.sql`
-```sql
-CREATE TABLE IF NOT EXISTS messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    chat_id VARCHAR(36) NOT NULL,
-    role ENUM('user', 'assistant') NOT NULL,
-    content TEXT NOT NULL,
-    stage1_data JSON DEFAULT NULL,
-    stage2_data JSON DEFAULT NULL,
-    stage3_data JSON DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_chat_id (chat_id),
-    FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+### 1. Auth Dependency (`backend/auth.py`)
+```python
+from fastapi import Depends, Request
+
+async def require_auth(request: Request) -> dict:
+    """FastAPI dependency for authenticated endpoints."""
+    session_id = request.cookies.get("session_id")
+    if not session_id or session_id not in sessions:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return sessions[session_id]
 ```
 
-### 2. Repository Functions (add to `backend/database.py`)
-| Function | Signature | Purpose |
-|----------|-----------|---------|
-| `create_message` | `(chat_id, role, content, stage1, stage2, stage3) -> Optional[dict]` | Create message with stage data |
-| `get_messages_by_chat_id` | `(chat_id: str) -> List[dict]` | List messages chronologically |
-| `get_message_by_id` | `(message_id: int) -> Optional[dict]` | Fetch single message |
-| `delete_chat` | `(chat_id: str) -> bool` | Delete chat (cascade delete test) |
+### 2. Storage Modifications (`backend/storage.py`)
+| Change | Description |
+|--------|-------------|
+| `create_conversation(id, type, user_id)` | Add user_id to conversation dict |
+| `list_conversations(user_id)` | Filter by user_id |
+| Conversation JSON | Add `user_id` field |
 
-## JSON Handling Notes
+### 3. Endpoint Modifications (`backend/main.py`)
+| Endpoint | Change |
+|----------|--------|
+| `POST /api/conversations` | Inject auth, pass user_id to storage |
+| `GET /api/conversations` | Inject auth, filter by user_id |
+| `GET /api/conversations/{id}` | Inject auth, verify ownership (403 if mismatch) |
+| `DELETE /api/conversations/{id}` | Inject auth, verify ownership |
+| `POST /api/conversations/{id}/message` | Inject auth, verify ownership |
 
-- MySQL JSON columns require proper serialization
-- Use `json.dumps()` for Python dict -> JSON string when inserting
-- mysql.connector may auto-deserialize JSON columns to dict
-- Stage data fields (stage1_data, stage2_data, stage3_data) are nullable
+### 4. Error Responses
+| Condition | HTTP Status | Response |
+|-----------|-------------|----------|
+| No session cookie | 401 | "Not authenticated" |
+| Invalid session | 401 | "Not authenticated" |
+| Conversation not found | 404 | "Conversation not found" |
+| User doesn't own conversation | 403 | "Access denied" |
 
 ## Refactoring Decision
 
@@ -92,12 +95,13 @@ CREATE TABLE IF NOT EXISTS messages (
 
 Rationale:
 1. No refactoring required
-2. Extend existing patterns in database.py
-3. New Flyway migration V3 for messages table
-4. All dependencies (V1 users, V2 chats) already exist
-5. Established patterns for FK with cascade delete
+2. Extend auth.py with FastAPI dependency
+3. Add user_id to storage.py functions
+4. Add auth checks to main.py endpoints
+5. All patterns already exist in codebase
 
 ## Implementation Order
-1. Create V3 migration for messages table
-2. Add repository functions to database.py
-3. Write tests validating all 5 scenarios
+1. Add `require_auth` dependency to auth.py
+2. Modify storage.py to include user_id
+3. Update main.py endpoints with auth + ownership checks
+4. Write tests for all 6 BDD scenarios

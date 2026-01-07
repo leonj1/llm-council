@@ -11,6 +11,7 @@ createRoot(document.getElementById('root')).render(
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/chat" element={<App />} />
+        <Route path="/chat/:conversationId" element={<App />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

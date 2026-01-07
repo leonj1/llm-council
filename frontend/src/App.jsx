@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import { api } from './api';
 import './App.css';
 
 function App() {
+  const { conversationId } = useParams();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
@@ -12,6 +15,7 @@ function App() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showChat, setShowChat] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -26,6 +30,13 @@ function App() {
     loadConversations();
   }, []);
 
+  // Sync URL param with state
+  useEffect(() => {
+    if (conversationId) {
+      setCurrentConversationId(conversationId);
+    }
+  }, [conversationId]);
+
   // Load conversation details when selected
   useEffect(() => {
     if (currentConversationId) {
@@ -39,6 +50,10 @@ function App() {
       setConversations(convs);
     } catch (error) {
       console.error('Failed to load conversations:', error);
+      // Handle auth errors
+      if (error.status === 401) {
+        navigate('/');
+      }
     }
   };
 
@@ -46,8 +61,29 @@ function App() {
     try {
       const conv = await api.getConversation(id);
       setCurrentConversation(conv);
+      setErrorMessage(null);
     } catch (error) {
       console.error('Failed to load conversation:', error);
+
+      // Handle different error types
+      if (error.status === 401) {
+        // Unauthenticated - redirect to landing page
+        navigate('/');
+      } else if (error.status === 403) {
+        // Forbidden - access denied
+        setErrorMessage('Access denied: You do not have permission to view this conversation');
+        navigate('/chat');
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      } else if (error.status === 404) {
+        // Not found
+        setErrorMessage('Conversation not found');
+        navigate('/chat');
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      } else {
+        setErrorMessage('Failed to load conversation');
+      }
     }
   };
 
@@ -58,7 +94,8 @@ function App() {
         { id: newConv.id, created_at: newConv.created_at, type: newConv.type, message_count: 0 },
         ...conversations,
       ]);
-      setCurrentConversationId(newConv.id);
+      // Navigate to new conversation URL
+      navigate(`/chat/${newConv.id}`);
       if (isMobile) {
         setShowChat(true);
       }
@@ -68,7 +105,8 @@ function App() {
   };
 
   const handleSelectConversation = (id) => {
-    setCurrentConversationId(id);
+    // Navigate to conversation URL (this will trigger useEffect to update state)
+    navigate(`/chat/${id}`);
     if (isMobile) {
       setShowChat(true);
     }
@@ -535,6 +573,35 @@ function App() {
 
   return (
     <div className={`app ${isMobile ? 'mobile' : ''}`}>
+      {errorMessage && (
+        <div className="error-banner" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: '#f44336',
+          color: 'white',
+          padding: '12px',
+          textAlign: 'center',
+          zIndex: 1000
+        }}>
+          {errorMessage}
+          <button
+            onClick={() => setErrorMessage(null)}
+            style={{
+              marginLeft: '12px',
+              backgroundColor: 'transparent',
+              border: '1px solid white',
+              color: 'white',
+              padding: '4px 8px',
+              cursor: 'pointer',
+              borderRadius: '4px'
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {showSidebar && (
         <Sidebar
           conversations={conversations}

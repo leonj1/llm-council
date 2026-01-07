@@ -2,12 +2,12 @@
 
 import logging
 import time
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import json
 import asyncio
@@ -23,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger("llm-council")
 
 from . import storage
-from .auth import router as auth_router
+from .auth import router as auth_router, require_auth
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 from .movie_script import (
     stage1_generate_scripts,
@@ -93,34 +93,48 @@ async def root():
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
-async def list_conversations():
-    """List all conversations (metadata only)."""
-    return storage.list_conversations()
+async def list_conversations(user: dict = Depends(require_auth)):
+    """List conversations for the authenticated user (metadata only)."""
+    return storage.list_conversations(user_id=user["user_id"])
 
 
 @app.post("/api/conversations", response_model=Conversation)
-async def create_conversation(request: CreateConversationRequest):
-    """Create a new conversation."""
+async def create_conversation(
+    user: dict = Depends(require_auth)
+):
+    """Create a new conversation for the authenticated user."""
     conversation_id = str(uuid.uuid4())
-    conversation = storage.create_conversation(conversation_id, request.type)
+    conversation_type = "council"  # Default type
+    conversation = storage.create_conversation(conversation_id, user["user_id"], conversation_type)
     return conversation
 
 
 @app.get("/api/conversations/{conversation_id}", response_model=Conversation)
-async def get_conversation(conversation_id: str):
-    """Get a specific conversation with all its messages."""
+async def get_conversation(conversation_id: str, user: dict = Depends(require_auth)):
+    """Get a specific conversation with all its messages (ownership enforced)."""
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Check ownership
+    if conversation.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     return conversation
 
 
 @app.delete("/api/conversations/{conversation_id}")
-async def delete_conversation(conversation_id: str):
-    """Delete a specific conversation."""
-    success = storage.delete_conversation(conversation_id)
-    if not success:
+async def delete_conversation(conversation_id: str, user: dict = Depends(require_auth)):
+    """Delete a specific conversation (ownership enforced)."""
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Check ownership
+    if conversation.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    success = storage.delete_conversation(conversation_id)
     return {"status": "deleted", "id": conversation_id}
 
 
@@ -147,15 +161,19 @@ def extract_conversation_history(messages: List[Dict[str, Any]]) -> List[Dict[st
 
 
 @app.post("/api/conversations/{conversation_id}/message")
-async def send_message(conversation_id: str, request: SendMessageRequest):
+async def send_message(conversation_id: str, request: SendMessageRequest, user: dict = Depends(require_auth)):
     """
-    Send a message and run the 3-stage council process.
+    Send a message and run the 3-stage council process (ownership enforced).
     Returns the complete response with all stages.
     """
     # Check if conversation exists
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Check ownership
+    if conversation.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
@@ -195,15 +213,19 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
 
 @app.post("/api/conversations/{conversation_id}/message/stream")
-async def send_message_stream(conversation_id: str, request: SendMessageRequest):
+async def send_message_stream(conversation_id: str, request: SendMessageRequest, user: dict = Depends(require_auth)):
     """
-    Send a message and stream the 3-stage council process.
+    Send a message and stream the 3-stage council process (ownership enforced).
     Returns Server-Sent Events as each stage completes.
     """
     # Check if conversation exists
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Check ownership
+    if conversation.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
@@ -269,15 +291,19 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
 
 @app.post("/api/conversations/{conversation_id}/movie-script/regenerate-final")
-async def regenerate_final_script(conversation_id: str):
+async def regenerate_final_script(conversation_id: str, user: dict = Depends(require_auth)):
     """
-    Regenerate the final script for a movie script conversation.
+    Regenerate the final script for a movie script conversation (ownership enforced).
     Uses the stored dialogue history to rebuild context and generate a new final script.
     """
     # Get conversation
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Check ownership
+    if conversation.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     if conversation.get("type") != "movie_script":
         raise HTTPException(status_code=400, detail="Not a movie script conversation")
@@ -413,9 +439,9 @@ Make this the best version of the script, synthesizing our collaborative improve
 
 
 @app.post("/api/conversations/{conversation_id}/movie-script/stream")
-async def send_movie_script_stream(conversation_id: str, request: MovieScriptRequest):
+async def send_movie_script_stream(conversation_id: str, request: MovieScriptRequest, user: dict = Depends(require_auth)):
     """
-    Generate a movie script with streaming updates.
+    Generate a movie script with streaming updates (ownership enforced).
     Returns Server-Sent Events as each stage completes.
     """
     workflow_start = time.time()
@@ -432,6 +458,10 @@ async def send_movie_script_stream(conversation_id: str, request: MovieScriptReq
     if conversation is None:
         logger.error(f"Conversation not found: {conversation_id}")
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Check ownership
+    if conversation.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # Validate num_turns
     num_turns = max(1, min(request.num_turns, MOVIE_SCRIPT_MAX_TURNS))
