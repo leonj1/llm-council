@@ -92,3 +92,36 @@ Active Task from architects_digest.md: 1.4 API Authorization (Pending)
 Next: Invoking architect agent
 ---
 
+=== Session 20260107-130847 ===
+Workflow: architect
+Task: Add an icon on each chat message that allows the user to toggle collapsing and expanding the message. This is for lengthy messages that force scrolling.
+Status: Initialized
+
+Context: LLM Council chat app. Messages can be lengthy (multi-stage LLM responses). Need collapse/expand UI for better UX.
+
+Tech Stack:
+  - Frontend: React 19, Vite 7, react-router-dom 7.11.0
+  - Backend: Python FastAPI on port 8004
+  - Styling: Plain CSS (no framework)
+
+Key Files:
+  - /root/repo/frontend/src/components/ChatInterface.jsx (renders messages with user/assistant roles)
+  - /root/repo/frontend/src/components/ChatInterface.css (message styling)
+  - /root/repo/frontend/src/components/Stage1.jsx (renders Stage 1 responses)
+  - /root/repo/frontend/src/components/Stage2.jsx (renders rankings)
+  - /root/repo/frontend/src/components/Stage3.jsx (renders final response)
+  - /root/repo/frontend/src/components/Stage4.jsx (movie script collab)
+
+Message Structure:
+  - User messages: { role: 'user', content: '...' }
+  - Assistant messages: { role: 'assistant', stage1, stage2, stage3, stage4?, metadata }
+
+UI Pattern Needed:
+  - Clickable icon (chevron or similar) on each message
+  - Click toggles collapsed/expanded state
+  - Collapsed shows truncated preview, expanded shows full content
+  - Default state: expanded (or configurable)
+
+Next: Invoking architect agent
+---
+
