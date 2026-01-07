@@ -1,11 +1,11 @@
 # Architect's Digest
-> Status: Planning
+> Status: In Progress
 
 ## Root Request
 "Wire main.py to use database.py for MySQL persistence instead of storage.py for JSON file storage. Replace storage.create_conversation() with database.create_chat(), storage.add_user_message()/add_assistant_message() with database.create_message(). Handle schema differences: storage uses conversation_id vs database uses chat_id, storage stores full message object vs database has separate columns for content, stage1_data, stage2_data, stage3_data."
 
 ## Active Stack
-1. Wire MySQL Persistence (Pending)
+1. Wire MySQL Persistence (In Progress)
 
 ---
 

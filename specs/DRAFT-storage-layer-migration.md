@@ -1,206 +1,158 @@
-# DRAFT: Storage Layer Migration
+# DRAFT: Wire main.py to database.py for MySQL Persistence
 
 ## Summary
-Create a new `chat_storage.py` module that provides MySQL-backed storage operations for user chats and messages, replacing the JSON file operations in `storage.py` with calls to the existing `database.py` functions.
+Replace storage.py function calls in main.py with direct calls to database.py. Handle schema translation between storage conventions (conversation_id, full message object) and database conventions (chat_id, separate columns).
 
 ## Root Request Traceability
-| Requirement Term | How This Spec Addresses It |
-|------------------|----------------------------|
-| "Updating storage.py to use MySQL instead of JSON files" | New chat_storage.py wraps database.py functions |
-| "retrievable from database" | All get/list operations query MySQL |
-| "Stage 1, 2, 3...persisted" | Stage data passed through to create_message |
-| "user_id...to associate chats with authenticated users" | user_id required param on all chat operations |
+| Root Request Term | How This Spec Addresses It |
+|-------------------|----------------------------|
+| "Wire main.py to use database.py" | Direct imports and calls to database.py in main.py |
+| "instead of storage.py" | Remove storage.py imports, replace all storage.* calls |
+| "storage.create_conversation() → database.create_chat()" | Explicit replacement in conversation creation endpoint |
+| "storage.add_user_message() → database.create_message()" | Replace with database.create_message(role="user") |
+| "storage.add_assistant_message() → database.create_message()" | Replace with database.create_message(role="assistant") |
+| "conversation_id vs chat_id" | Translate API param conversation_id to database chat_id |
+| "separate columns for content, stage1_data, stage2_data, stage3_data" | Unpack message object into separate params |
 
 ## Interfaces Needed
 
-### IChatStorage (Protocol)
-```python
-from typing import Protocol, List, Dict, Any, Optional
-
-class IChatStorage(Protocol):
-    """Interface for chat storage operations."""
-
-    def create_chat(self, user_id: int, chat_type: str = "council") -> Optional[Dict[str, Any]]:
-        """Create new chat for user. Returns chat dict or None."""
-        ...
-
-    def get_chat(self, chat_id: str, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get chat by ID. Returns None if not found or wrong user."""
-        ...
-
-    def list_chats(self, user_id: int) -> List[Dict[str, Any]]:
-        """List all chats for user with metadata."""
-        ...
-
-    def delete_chat(self, chat_id: str, user_id: int) -> bool:
-        """Delete chat. Returns False if not found or wrong user."""
-        ...
-
-    def add_user_message(self, chat_id: str, user_id: int, content: str) -> Optional[Dict[str, Any]]:
-        """Add user message to chat. Returns message or None."""
-        ...
-
-    def add_assistant_message(
-        self,
-        chat_id: str,
-        user_id: int,
-        stage1: List[Dict[str, Any]],
-        stage2: List[Dict[str, Any]],
-        stage3: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
-        """Add assistant message with stage data. Returns message or None."""
-        ...
-
-    def get_messages(self, chat_id: str, user_id: int) -> List[Dict[str, Any]]:
-        """Get all messages for chat. Empty list if wrong user."""
-        ...
-```
+None. This is direct wiring - no new abstractions.
 
 ## Data Models
 
-### Chat (returned from create_chat, get_chat)
+### Schema Translation Map
 ```python
-{
-    "id": str,          # UUID
-    "user_id": int,
-    "created_at": datetime,
-    "title": str,       # Default "New Conversation"
-    "type": str,        # "council" or "movie_script"
-    "message_count": int  # Only in list_chats
-}
-```
-
-### Message (returned from add_*_message, get_messages)
-```python
-{
-    "id": int,
-    "chat_id": str,
-    "role": str,        # "user" or "assistant"
-    "content": str,
-    "stage1_data": Optional[List[Dict]],
-    "stage2_data": Optional[List[Dict]],
-    "stage3_data": Optional[Dict],
-    "created_at": datetime
-}
+# API/Storage convention → Database convention
+"conversation_id"     → "chat_id"
+"conversation"        → "chat"
+message["content"]    → content param
+message["stage1"]     → stage1_data param
+message["stage2"]     → stage2_data param
+message["stage3"]     → stage3_data param
 ```
 
 ## Logic Flow
 
-### create_chat(user_id, chat_type)
+### Endpoint: POST /api/conversations (Create)
 ```
-1. Call database.create_chat(user_id)
-2. If None, return None
-3. Return enriched dict with title="New Conversation", type=chat_type
-```
-
-### get_chat(chat_id, user_id)
-```
-1. Call database.get_chat_by_id(chat_id)
-2. If None, return None
-3. If chat.user_id != user_id, return None  # Authorization
-4. Enrich with message_count via get_messages_by_chat_id
-5. Return chat dict
+BEFORE: storage.create_conversation()
+AFTER:  database.create_chat(user_id)
+        # Returns chat with chat_id
+        # Response: translate chat_id → conversation_id for API compat
 ```
 
-### list_chats(user_id)
+### Endpoint: GET /api/conversations/{conversation_id}
 ```
-1. Call database.get_chats_by_user_id(user_id)
-2. For each chat, count messages
-3. Return list with metadata (title, type, message_count)
-```
-
-### delete_chat(chat_id, user_id)
-```
-1. Call database.get_chat_by_id(chat_id)
-2. If None or chat.user_id != user_id, return False
-3. Call database.delete_chat(chat_id)
-4. Return result
+BEFORE: storage.get_conversation(conversation_id)
+AFTER:  database.get_chat_by_id(conversation_id)
+        database.get_messages_by_chat_id(conversation_id)
+        # Assemble response matching API format
 ```
 
-### add_user_message(chat_id, user_id, content)
+### Endpoint: POST /api/conversations/{conversation_id}/message
 ```
-1. Verify chat ownership via get_chat(chat_id, user_id)
-2. If None, return None
-3. Call database.create_message(chat_id, "user", content, None, None, None)
-4. Return message dict
+BEFORE:
+  storage.add_user_message(conversation_id, content)
+  storage.add_assistant_message(conversation_id, {stage1, stage2, stage3})
+
+AFTER:
+  database.create_message(
+    chat_id=conversation_id,
+    role="user",
+    content=content,
+    stage1_data=None,
+    stage2_data=None,
+    stage3_data=None
+  )
+  database.create_message(
+    chat_id=conversation_id,
+    role="assistant",
+    content=stage3["content"],
+    stage1_data=stage1,
+    stage2_data=stage2,
+    stage3_data=stage3
+  )
 ```
 
-### add_assistant_message(chat_id, user_id, stage1, stage2, stage3)
+### Endpoint: GET /api/conversations
 ```
-1. Verify chat ownership via get_chat(chat_id, user_id)
-2. If None, return None
-3. Extract content from stage3["content"] for display
-4. Call database.create_message(chat_id, "assistant", content, stage1, stage2, stage3)
-5. Return message dict
+BEFORE: storage.list_conversations()
+AFTER:  database.get_chats_by_user_id(user_id)
+        # Translate each chat_id → conversation_id in response
 ```
 
-### get_messages(chat_id, user_id)
-```
-1. Verify chat ownership via get_chat(chat_id, user_id)
-2. If None, return []
-3. Call database.get_messages_by_chat_id(chat_id)
-4. Return messages list
-```
+## Files to Modify
 
-## Files to Create/Modify
-
-| File | Action | Purpose |
+| File | Action | Changes |
 |------|--------|---------|
-| backend/chat_storage.py | CREATE | MySQL-backed storage module |
-| backend/tests/test_chat_storage.py | CREATE | Unit tests for chat_storage |
+| backend/main.py | MODIFY | Replace storage.* imports with database.*, update all endpoint implementations |
 
 ## BDD Scenarios (4)
 
-### Scenario 1: Chat creation persists to MySQL
+### Scenario 1: Create conversation uses database.create_chat
 ```gherkin
-Given a user with id 1 exists
-When I create a chat for user 1
-Then the chat should be stored in MySQL
-And the chat should have user_id 1
+Given main.py is wired to database.py
+When POST /api/conversations is called
+Then database.create_chat() should be invoked
+And the response should contain conversation_id (translated from chat_id)
 ```
 
-### Scenario 2: User message persistence
+### Scenario 2: Add user message uses database.create_message
 ```gherkin
-Given a chat exists for user 1
-When I add a user message "Hello"
-Then the message should be stored in MySQL
-And the message role should be "user"
+Given a conversation exists with id "abc123"
+When POST /api/conversations/abc123/message is called with content "Hello"
+Then database.create_message() should be invoked with:
+  | param | value |
+  | chat_id | abc123 |
+  | role | user |
+  | content | Hello |
+  | stage1_data | None |
+  | stage2_data | None |
+  | stage3_data | None |
 ```
 
-### Scenario 3: Assistant message with stages
+### Scenario 3: Add assistant message unpacks stages to separate columns
 ```gherkin
-Given a chat exists for user 1
-When I add an assistant message with stage1, stage2, stage3 data
-Then all three stages should be stored as JSON
-And the message role should be "assistant"
+Given a conversation exists with id "abc123"
+And stage1_data is [{"model": "gpt-4", "response": "..."}]
+And stage2_data is [{"model": "gpt-4", "ranking": "..."}]
+And stage3_data is {"content": "Final answer", "model": "gemini"}
+When the assistant message is added
+Then database.create_message() should be invoked with:
+  | param | value |
+  | chat_id | abc123 |
+  | role | assistant |
+  | content | Final answer |
+  | stage1_data | [{"model": "gpt-4", "response": "..."}] |
+  | stage2_data | [{"model": "gpt-4", "ranking": "..."}] |
+  | stage3_data | {"content": "Final answer", "model": "gemini"} |
 ```
 
-### Scenario 4: User isolation on retrieval
+### Scenario 4: Get conversation translates chat_id to conversation_id
 ```gherkin
-Given user 1 has a chat
-And user 2 exists
-When user 2 tries to get user 1's chat
-Then the result should be None
+Given database.get_chat_by_id("abc123") returns a chat
+When GET /api/conversations/abc123 is called
+Then the response should use "id" or "conversation_id" (not "chat_id")
+And messages should be retrieved via database.get_messages_by_chat_id()
 ```
 
 ## Context Budget
 
 | Category | Estimate |
 |----------|----------|
-| Files to read | 2 (~400 lines) - database.py, storage.py |
-| New code to write | ~150 lines |
-| Test code to write | ~100 lines |
-| Total files | 2 new files |
-| Estimated context usage | 25% |
+| Files to read | 2 (~300 lines) - main.py, database.py |
+| Code to modify | ~80 lines in main.py |
+| Test code to write | ~60 lines |
+| Estimated context usage | 15% |
+
+## What This Spec Does NOT Include (Per User Request)
+
+- No new wrapper module (chat_storage.py) - direct wiring
+- No user isolation logic - not requested
+- No chat deletion - not requested
+- No chat types/titles - not requested
+- No error handling beyond existing - not requested
 
 ## Dependencies
 
-- database.py (existing) - provides raw MySQL operations
-- storage.py (existing) - kept for backward compatibility, not modified
-
-## Notes
-
-- Keep existing storage.py unchanged for backward compatibility
-- chat_storage.py is a thin wrapper adding user authorization
-- Stage data stored as JSON in MySQL TEXT columns
-- Authorization is enforced at storage layer, not just API
+- database.py (existing) - provides create_chat, create_message, get_chat_by_id, get_messages_by_chat_id, get_chats_by_user_id
