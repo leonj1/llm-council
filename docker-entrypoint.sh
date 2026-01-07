@@ -2,24 +2,31 @@
 set -e
 
 # Run Flyway migrations if database is configured
-if [ -n "$MYSQL_HOST" ] && [ -n "$MYSQL_DATABASE" ]; then
+# Support both Railway (DB_*) and local (MYSQL_*) env vars
+FLYWAY_HOST="${DB_HOST:-$MYSQL_HOST}"
+FLYWAY_PORT="${DB_PORT:-${MYSQL_PORT:-3306}}"
+FLYWAY_DB="${DB_NAME:-$MYSQL_DATABASE}"
+FLYWAY_USER="${DB_USER:-${MYSQL_USER:-root}}"
+FLYWAY_PASS="${DB_PASSWORD:-${MYSQL_PASSWORD:-}}"
+
+if [ -n "$FLYWAY_HOST" ] && [ -n "$FLYWAY_DB" ]; then
     echo "Running Flyway migrations..."
 
     # Build Flyway JDBC URL
-    FLYWAY_URL="jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT:-3306}/${MYSQL_DATABASE}"
+    FLYWAY_URL="jdbc:mysql://${FLYWAY_HOST}:${FLYWAY_PORT}/${FLYWAY_DB}"
 
     # Run Flyway migrate
     flyway \
         -url="${FLYWAY_URL}" \
-        -user="${MYSQL_USER:-root}" \
-        -password="${MYSQL_PASSWORD:-}" \
+        -user="${FLYWAY_USER}" \
+        -password="${FLYWAY_PASS}" \
         -locations="filesystem:/app/sql" \
         -connectRetries=5 \
         migrate
 
     echo "Flyway migrations completed."
 else
-    echo "Database not configured (MYSQL_HOST or MYSQL_DATABASE not set). Skipping Flyway migrations."
+    echo "Database not configured (DB_HOST/MYSQL_HOST or DB_NAME/MYSQL_DATABASE not set). Skipping Flyway migrations."
 fi
 
 # Check if we can run Tailscale (need /dev/net/tun)
