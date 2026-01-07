@@ -125,3 +125,47 @@ UI Pattern Needed:
 Next: Invoking architect agent
 ---
 
+=== Session 20260107-201900 ===
+Workflow: debugger
+Task: Chat persistence bug - data not saved to database despite 200 responses
+Status: Initialized
+
+Symptom:
+  - POST /api/conversations returns 200
+  - POST /api/conversations/{id}/message/stream returns 200
+  - But data is NOT persisted to database
+
+Context: LLM Council app with dual storage system - JSON files (storage.py) AND MySQL (database.py)
+
+Critical Discovery:
+  - storage.py uses JSON files (DATA_DIR = "data/conversations")
+  - database.py has MySQL CRUD for chats/messages tables
+  - main.py ONLY calls storage.py functions, NEVER calls database.py persistence
+  - This is the root cause: MySQL persistence code exists but is not wired up
+
+Tech Stack:
+  - Frontend: React 19, Vite 7, react-router-dom 7.11.0
+  - Backend: Python FastAPI on port 8004
+  - Database: MySQL with Flyway migrations (V1-V3)
+  - Auth: Google OAuth with session cookies
+
+Key Files:
+  - /root/repo/backend/main.py (API endpoints - calls storage.py only)
+  - /root/repo/backend/storage.py (JSON file storage - DATA_DIR based)
+  - /root/repo/backend/database.py (MySQL CRUD - create_chat, create_message, etc.)
+  - /root/repo/sql/V2__create_chats_table.sql (chats table migration)
+  - /root/repo/sql/V3__create_messages_table.sql (messages table migration)
+
+Database Schema:
+  - chats: id (UUID), user_id (FK), created_at
+  - messages: id, chat_id (FK), role, content, stage1_data, stage2_data, stage3_data, created_at
+
+Bug Analysis:
+  1. main.py line 150: storage.create_conversation() -> saves to JSON file
+  2. main.py line 281: storage.add_user_message() -> saves to JSON file
+  3. main.py line 311-316: storage.add_assistant_message() -> saves to JSON file
+  4. database.py has create_chat(), create_message() but NEVER called from main.py
+
+Next: Invoking debugger agent to implement fix
+---
+
