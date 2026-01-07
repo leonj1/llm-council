@@ -9,6 +9,23 @@ export const getApiBase = () => API_BASE;
 
 export const api = {
   /**
+   * Check database connection status.
+   */
+  async checkDatabaseStatus() {
+    try {
+      const response = await fetch(`${API_BASE}/api/health/db`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        return { connected: false };
+      }
+      return response.json();
+    } catch {
+      return { connected: false };
+    }
+  },
+
+  /**
    * List all conversations.
    */
   async listConversations() {

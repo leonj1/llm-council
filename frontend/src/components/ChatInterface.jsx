@@ -5,6 +5,7 @@ import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import Stage3MovieScript from './Stage3MovieScript';
 import Stage4 from './Stage4';
+import DatabaseStatus from './DatabaseStatus';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -60,12 +61,17 @@ export default function ChatInterface({
   if (!conversation) {
     return (
       <div className={`chat-interface ${isMobile ? 'mobile' : ''}`}>
-        {isMobile && (
+        {isMobile ? (
           <div className="mobile-header">
             <button className="back-button" onClick={onBack}>
               ‹ Back
             </button>
             <h2>LLM Council</h2>
+            <DatabaseStatus />
+          </div>
+        ) : (
+          <div className="desktop-header">
+            <DatabaseStatus />
           </div>
         )}
         <div className="empty-state">
@@ -78,12 +84,17 @@ export default function ChatInterface({
 
   return (
     <div className={`chat-interface ${isMobile ? 'mobile' : ''}`}>
-      {isMobile && (
+      {isMobile ? (
         <div className="mobile-header">
           <button className="back-button" onClick={onBack}>
             ‹ Back
           </button>
           <h2>{conversation.title || 'New Conversation'}</h2>
+          <DatabaseStatus />
+        </div>
+      ) : (
+        <div className="desktop-header">
+          <DatabaseStatus />
         </div>
       )}
       <div className="messages-container">
