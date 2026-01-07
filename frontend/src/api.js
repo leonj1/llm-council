@@ -26,6 +26,21 @@ export const api = {
   },
 
   /**
+   * Get database configuration (requires authentication).
+   */
+  async getDatabaseConfig() {
+    const response = await fetch(`${API_BASE}/api/db/config`, {
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = new Error('Failed to get database config');
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  },
+
+  /**
    * List all conversations.
    */
   async listConversations() {
