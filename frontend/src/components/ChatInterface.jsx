@@ -20,7 +20,32 @@ export default function ChatInterface({
   const [input, setInput] = useState('');
   const [numTurns, setNumTurns] = useState(3);
   const [movieLength, setMovieLength] = useState(90);
+  const [collapsedMessages, setCollapsedMessages] = useState({});
   const messagesEndRef = useRef(null);
+
+  const toggleCollapse = (index) => {
+    setCollapsedMessages(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const truncateText = (text, maxLength = 100) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
+  const CollapseIcon = ({ isCollapsed }) => (
+    <svg
+      className={`collapse-icon ${isCollapsed ? 'collapsed' : ''}`}
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+    >
+      <path d="M4.5 5.5L8 9L11.5 5.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
 
   const movieLengthOptions = [
     { value: 5, label: '5 min (Short)' },
@@ -112,82 +137,113 @@ export default function ChatInterface({
             <div key={index} className="message-group">
               {msg.role === 'user' ? (
                 <div className="user-message">
-                  <div className="message-label">You</div>
-                  <div className="message-content">
-                    <div className="markdown-content">
-                      <Markdown>{msg.content}</Markdown>
-                    </div>
+                  <div className="message-label">
+                    <button
+                      className="collapse-toggle"
+                      onClick={() => toggleCollapse(index)}
+                      aria-label={collapsedMessages[index] ? 'Expand message' : 'Collapse message'}
+                    >
+                      <CollapseIcon isCollapsed={collapsedMessages[index]} />
+                    </button>
+                    You
                   </div>
+                  {collapsedMessages[index] ? (
+                    <div className="message-content collapsed-preview">
+                      {truncateText(msg.content)}
+                    </div>
+                  ) : (
+                    <div className="message-content">
+                      <div className="markdown-content">
+                        <Markdown>{msg.content}</Markdown>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="assistant-message">
                   <div className="message-label">
+                    <button
+                      className="collapse-toggle"
+                      onClick={() => toggleCollapse(index)}
+                      disabled={msg.loading?.stage1 || msg.loading?.stage2 || msg.loading?.stage3 || msg.loading?.stage4}
+                      aria-label={collapsedMessages[index] ? 'Expand message' : 'Collapse message'}
+                    >
+                      <CollapseIcon isCollapsed={collapsedMessages[index]} />
+                    </button>
                     {isMovieScript ? 'Movie Script Studio' : 'LLM Council'}
                   </div>
 
-                  {/* Stage 1 */}
-                  {msg.loading?.stage1 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>
-                        {isMovieScript
-                          ? 'Running Stage 1: Generating script proposals...'
-                          : 'Running Stage 1: Collecting individual responses...'}
-                      </span>
+                  {collapsedMessages[index] ? (
+                    <div className="collapsed-preview assistant-collapsed">
+                      <em>Message collapsed - click to expand</em>
                     </div>
-                  )}
-                  {msg.stage1 && <Stage1 responses={msg.stage1} />}
-
-                  {/* Stage 2 */}
-                  {msg.loading?.stage2 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 2: Peer review and ranking...</span>
-                    </div>
-                  )}
-                  {msg.stage2 && (
-                    <Stage2
-                      rankings={msg.stage2}
-                      labelToModel={msg.metadata?.label_to_model}
-                      aggregateRankings={msg.metadata?.aggregate_rankings}
-                    />
-                  )}
-
-                  {/* Stage 3 - Different component for movie script */}
-                  {msg.loading?.stage3 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>
-                        {isMovieScript
-                          ? 'Running Stage 3: Selecting best script...'
-                          : 'Running Stage 3: Final synthesis...'}
-                      </span>
-                    </div>
-                  )}
-                  {msg.stage3 && (
-                    isMovieScript ? (
-                      <Stage3MovieScript selection={msg.stage3} />
-                    ) : (
-                      <Stage3 finalResponse={msg.stage3} />
-                    )
-                  )}
-
-                  {/* Stage 4 - Movie script only */}
-                  {isMovieScript && (
+                  ) : (
                     <>
-                      {msg.loading?.stage4 && !msg.stage4?.dialogue_history?.length && (
+                      {/* Stage 1 */}
+                      {msg.loading?.stage1 && (
                         <div className="stage-loading">
                           <div className="spinner"></div>
-                          <span>Running Stage 4: Starting collaborative refinement...</span>
+                          <span>
+                            {isMovieScript
+                              ? 'Running Stage 1: Generating script proposals...'
+                              : 'Running Stage 1: Collecting individual responses...'}
+                          </span>
                         </div>
                       )}
-                      {(msg.stage4 || msg.loading?.stage4) && (
-                        <Stage4
-                          stage4Data={msg.stage4}
-                          isLoading={msg.loading?.stage4}
-                          onRegenerateFinalScript={onRegenerateFinalScript}
-                          isRegenerating={isRegenerating}
+                      {msg.stage1 && <Stage1 responses={msg.stage1} />}
+
+                      {/* Stage 2 */}
+                      {msg.loading?.stage2 && (
+                        <div className="stage-loading">
+                          <div className="spinner"></div>
+                          <span>Running Stage 2: Peer review and ranking...</span>
+                        </div>
+                      )}
+                      {msg.stage2 && (
+                        <Stage2
+                          rankings={msg.stage2}
+                          labelToModel={msg.metadata?.label_to_model}
+                          aggregateRankings={msg.metadata?.aggregate_rankings}
                         />
+                      )}
+
+                      {/* Stage 3 - Different component for movie script */}
+                      {msg.loading?.stage3 && (
+                        <div className="stage-loading">
+                          <div className="spinner"></div>
+                          <span>
+                            {isMovieScript
+                              ? 'Running Stage 3: Selecting best script...'
+                              : 'Running Stage 3: Final synthesis...'}
+                          </span>
+                        </div>
+                      )}
+                      {msg.stage3 && (
+                        isMovieScript ? (
+                          <Stage3MovieScript selection={msg.stage3} />
+                        ) : (
+                          <Stage3 finalResponse={msg.stage3} />
+                        )
+                      )}
+
+                      {/* Stage 4 - Movie script only */}
+                      {isMovieScript && (
+                        <>
+                          {msg.loading?.stage4 && !msg.stage4?.dialogue_history?.length && (
+                            <div className="stage-loading">
+                              <div className="spinner"></div>
+                              <span>Running Stage 4: Starting collaborative refinement...</span>
+                            </div>
+                          )}
+                          {(msg.stage4 || msg.loading?.stage4) && (
+                            <Stage4
+                              stage4Data={msg.stage4}
+                              isLoading={msg.loading?.stage4}
+                              onRegenerateFinalScript={onRegenerateFinalScript}
+                              isRegenerating={isRegenerating}
+                            />
+                          )}
+                        </>
                       )}
                     </>
                   )}
