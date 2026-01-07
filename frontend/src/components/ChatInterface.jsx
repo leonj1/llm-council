@@ -6,6 +6,7 @@ import Stage3 from './Stage3';
 import Stage3MovieScript from './Stage3MovieScript';
 import Stage4 from './Stage4';
 import DatabaseStatus from './DatabaseStatus';
+import DbConfigModal from './DbConfigModal';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -21,6 +22,7 @@ export default function ChatInterface({
   const [numTurns, setNumTurns] = useState(3);
   const [movieLength, setMovieLength] = useState(90);
   const [collapsedMessages, setCollapsedMessages] = useState({});
+  const [showDbConfigModal, setShowDbConfigModal] = useState(false);
   const messagesEndRef = useRef(null);
 
   const toggleCollapse = (index) => {
@@ -92,17 +94,18 @@ export default function ChatInterface({
               ‹ Back
             </button>
             <h2>LLM Council</h2>
-            <DatabaseStatus />
+            <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
           </div>
         ) : (
           <div className="desktop-header">
-            <DatabaseStatus />
+            <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
           </div>
         )}
         <div className="empty-state">
           <h2>Welcome to LLM Council</h2>
           <p>Create a new conversation to get started</p>
         </div>
+        <DbConfigModal isOpen={showDbConfigModal} onClose={() => setShowDbConfigModal(false)} />
       </div>
     );
   }
@@ -115,13 +118,14 @@ export default function ChatInterface({
             ‹ Back
           </button>
           <h2>{conversation.title || 'New Conversation'}</h2>
-          <DatabaseStatus />
+          <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
         </div>
       ) : (
         <div className="desktop-header">
-          <DatabaseStatus />
+          <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
         </div>
       )}
+      <DbConfigModal isOpen={showDbConfigModal} onClose={() => setShowDbConfigModal(false)} />
       <div className="messages-container">
         {conversation.messages.length === 0 ? (
           <div className="empty-state">

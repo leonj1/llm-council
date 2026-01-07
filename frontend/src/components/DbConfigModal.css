@@ -1,0 +1,138 @@
+.db-config-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.db-config-modal {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 90%;
+  max-width: 450px;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.db-config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.db-config-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.db-config-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.db-config-close:hover {
+  color: #333;
+}
+
+.db-config-body {
+  padding: 20px;
+}
+
+.db-config-loading {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.db-config-error {
+  text-align: center;
+  padding: 20px;
+  color: #c62828;
+  background: #ffebee;
+  border-radius: 4px;
+}
+
+.db-config-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.db-config-table tr {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.db-config-table tr:last-child {
+  border-bottom: none;
+}
+
+.db-config-table td {
+  padding: 12px 0;
+  vertical-align: middle;
+}
+
+.db-config-label {
+  font-weight: 500;
+  color: #666;
+  width: 100px;
+}
+
+.db-config-table code {
+  background: #f5f5f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 13px;
+  color: #333;
+}
+
+.db-config-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.db-config-status.connected {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.db-config-status.connected::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4caf50;
+}
+
+.db-config-status.disconnected {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.db-config-status.disconnected::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f44336;
+}

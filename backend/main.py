@@ -106,6 +106,34 @@ async def database_health():
         return {"connected": False}
 
 
+@app.get("/api/db/config")
+async def get_db_config(user: dict = Depends(require_auth)):
+    """Get database configuration (auth-protected, sensitive values masked)."""
+    from .database import _get_db_config, get_connection
+
+    config = _get_db_config()
+
+    # Test connection to get status
+    connected = False
+    try:
+        connection = get_connection()
+        if connection is not None:
+            connection.close()
+            connected = True
+    except Exception:
+        pass
+
+    # Return config with password masked
+    return {
+        "host": config.get("host", ""),
+        "port": config.get("port", 3306),
+        "user": config.get("user", ""),
+        "database": config.get("database", ""),
+        "password": "********" if config.get("password") else "(not set)",
+        "connected": connected,
+    }
+
+
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
 async def list_conversations(user: dict = Depends(require_auth)):
     """List conversations for the authenticated user (metadata only)."""
