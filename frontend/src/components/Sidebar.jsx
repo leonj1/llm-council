@@ -8,6 +8,8 @@ export default function Sidebar({
   onNewConversation,
   onDeleteConversation,
   isMobile,
+  collapsed,
+  onToggleCollapse,
 }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -48,16 +50,29 @@ export default function Sidebar({
   };
 
   return (
-    <div className={`sidebar ${isMobile ? 'mobile' : ''}`}>
+    <div className={`sidebar ${isMobile ? 'mobile' : ''} ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
-        <h1>LLM Council</h1>
-        <div className="new-conversation-dropdown" ref={dropdownRef}>
-          <button
-            className="new-conversation-btn"
-            onClick={() => setShowDropdown(!showDropdown)}
-          >
-            + New
-          </button>
+        <div className="sidebar-header-top">
+          {!collapsed && <h1>LLM Council</h1>}
+          {!isMobile && (
+            <button
+              className="collapse-toggle-btn"
+              onClick={onToggleCollapse}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? '»' : '«'}
+            </button>
+          )}
+        </div>
+        {!collapsed && (
+          <div className="new-conversation-dropdown" ref={dropdownRef}>
+            <button
+              className="new-conversation-btn"
+              onClick={() => setShowDropdown(!showDropdown)}
+            >
+              + New
+            </button>
           {showDropdown && (
             <div className="dropdown-menu">
               <button
@@ -82,59 +97,67 @@ export default function Sidebar({
               </button>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
 
-      <div className={`conversation-list ${isMobile ? 'cards' : ''}`}>
+      <div className={`conversation-list ${isMobile ? 'cards' : ''} ${collapsed ? 'collapsed' : ''}`}>
         {conversations.length === 0 ? (
-          <div className="no-conversations">
-            <p>No conversations yet</p>
-            <p className="no-conversations-hint">Tap "+ New" to get started</p>
-          </div>
+          !collapsed && (
+            <div className="no-conversations">
+              <p>No conversations yet</p>
+              <p className="no-conversations-hint">Tap "+ New" to get started</p>
+            </div>
+          )
         ) : (
           conversations.map((conv) => (
             <div
               key={conv.id}
               className={`conversation-item ${isMobile ? 'card' : ''} ${
                 conv.id === currentConversationId ? 'active' : ''
-              }`}
+              } ${collapsed ? 'collapsed' : ''}`}
               onClick={() => onSelectConversation(conv.id)}
+              title={collapsed ? (conv.title || 'New Conversation') : undefined}
             >
               <div className="conversation-type-icon">
                 {conv.type === 'movie_script' ? '🎬' : '💬'}
               </div>
-              <div className="conversation-info">
-                <div className="conversation-title">
-                  {conv.title || 'New Conversation'}
-                </div>
-                <div className="conversation-meta">
-                  {conv.message_count} messages
-                </div>
-              </div>
-              <div
-                className="conversation-menu-wrapper"
-                ref={openMenuId === conv.id ? menuRef : null}
-              >
-                <button
-                  className="conversation-menu-btn"
-                  onClick={(e) => handleMenuClick(e, conv.id)}
-                  aria-label="Conversation options"
-                >
-                  ⋮
-                </button>
-                {openMenuId === conv.id && (
-                  <div className="conversation-menu">
-                    <button
-                      className="conversation-menu-item delete"
-                      onClick={(e) => handleDelete(e, conv.id)}
-                    >
-                      🗑️ Delete
-                    </button>
+              {!collapsed && (
+                <>
+                  <div className="conversation-info">
+                    <div className="conversation-title">
+                      {conv.title || 'New Conversation'}
+                    </div>
+                    <div className="conversation-meta">
+                      {conv.message_count} messages
+                    </div>
                   </div>
-                )}
-              </div>
-              {isMobile && (
-                <div className="conversation-arrow">›</div>
+                  <div
+                    className="conversation-menu-wrapper"
+                    ref={openMenuId === conv.id ? menuRef : null}
+                  >
+                    <button
+                      className="conversation-menu-btn"
+                      onClick={(e) => handleMenuClick(e, conv.id)}
+                      aria-label="Conversation options"
+                    >
+                      ⋮
+                    </button>
+                    {openMenuId === conv.id && (
+                      <div className="conversation-menu">
+                        <button
+                          className="conversation-menu-item delete"
+                          onClick={(e) => handleDelete(e, conv.id)}
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {isMobile && (
+                    <div className="conversation-arrow">›</div>
+                  )}
+                </>
               )}
             </div>
           ))
