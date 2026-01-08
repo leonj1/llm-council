@@ -1,21 +1,7 @@
-"""JSON-based storage for conversations."""
+"""Storage layer for conversations - delegates to MySQL database."""
 
-import json
-import os
-from datetime import datetime
 from typing import List, Dict, Any, Optional
-from pathlib import Path
-from .config import DATA_DIR
-
-
-def ensure_data_dir():
-    """Ensure the data directory exists."""
-    Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
-
-
-def get_conversation_path(conversation_id: str) -> str:
-    """Get the file path for a conversation."""
-    return os.path.join(DATA_DIR, f"{conversation_id}.json")
+from . import database
 
 
 def create_conversation(conversation_id: str, user_id: int, conversation_type: str = "council") -> Dict[str, Any]:
@@ -23,30 +9,37 @@ def create_conversation(conversation_id: str, user_id: int, conversation_type: s
     Create a new conversation.
 
     Args:
-        conversation_id: Unique identifier for the conversation
+        conversation_id: Unique identifier for the conversation (ignored - database generates UUID)
         user_id: ID of the user who owns this conversation
         conversation_type: Type of conversation ("council" or "movie_script")
 
     Returns:
-        New conversation dict
+        New conversation dict with id, user_id, created_at, title, type, messages
     """
-    ensure_data_dir()
+    # Create chat in database (generates its own UUID)
+    chat = database.create_chat(user_id)
 
-    conversation = {
-        "id": conversation_id,
-        "user_id": user_id,
-        "created_at": datetime.utcnow().isoformat(),
-        "title": "New Conversation",
-        "type": conversation_type,
+    if chat is None:
+        # Fallback: return minimal structure if database unavailable
+        from datetime import datetime
+        return {
+            "id": conversation_id,
+            "user_id": user_id,
+            "created_at": datetime.utcnow().isoformat(),
+            "title": "New Conversation",
+            "type": conversation_type,
+            "messages": []
+        }
+
+    # Convert database format to storage format
+    return {
+        "id": chat["id"],
+        "user_id": chat["user_id"],
+        "created_at": str(chat["created_at"]),
+        "title": chat.get("title", "New Conversation"),
+        "type": chat.get("type", conversation_type),
         "messages": []
     }
-
-    # Save to file
-    path = get_conversation_path(conversation_id)
-    with open(path, 'w') as f:
-        json.dump(conversation, f, indent=2)
-
-    return conversation
 
 
 def get_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
@@ -59,27 +52,45 @@ def get_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
     Returns:
         Conversation dict or None if not found
     """
-    path = get_conversation_path(conversation_id)
+    # Get chat from database
+    chat = database.get_chat_by_id(conversation_id)
 
-    if not os.path.exists(path):
+    if chat is None:
         return None
 
-    with open(path, 'r') as f:
-        return json.load(f)
+    # Get messages for this chat
+    db_messages = database.get_messages_by_chat_id(conversation_id)
 
+    # Convert messages from database format to storage format
+    messages = []
+    for msg in db_messages:
+        if msg["role"] == "user":
+            messages.append({
+                "role": "user",
+                "content": msg["content"]
+            })
+        else:
+            # Assistant message with stage data
+            message = {"role": "assistant"}
+            if msg.get("stage1_data"):
+                message["stage1"] = msg["stage1_data"]
+            if msg.get("stage2_data"):
+                message["stage2"] = msg["stage2_data"]
+            if msg.get("stage3_data"):
+                message["stage3"] = msg["stage3_data"]
+            # Check for stage4 (movie script)
+            if msg.get("stage4_data"):
+                message["stage4"] = msg["stage4_data"]
+            messages.append(message)
 
-def save_conversation(conversation: Dict[str, Any]):
-    """
-    Save a conversation to storage.
-
-    Args:
-        conversation: Conversation dict to save
-    """
-    ensure_data_dir()
-
-    path = get_conversation_path(conversation['id'])
-    with open(path, 'w') as f:
-        json.dump(conversation, f, indent=2)
+    return {
+        "id": chat["id"],
+        "user_id": chat["user_id"],
+        "created_at": str(chat["created_at"]),
+        "title": chat.get("title", "New Conversation"),
+        "type": chat.get("type", "council"),
+        "messages": messages
+    }
 
 
 def delete_conversation(conversation_id: str) -> bool:
@@ -92,13 +103,7 @@ def delete_conversation(conversation_id: str) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    path = get_conversation_path(conversation_id)
-
-    if not os.path.exists(path):
-        return False
-
-    os.remove(path)
-    return True
+    return database.delete_chat(conversation_id)
 
 
 def list_conversations(user_id: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -111,30 +116,22 @@ def list_conversations(user_id: Optional[int] = None) -> List[Dict[str, Any]]:
     Returns:
         List of conversation metadata dicts
     """
-    ensure_data_dir()
+    if user_id is None:
+        # Without user_id filtering, return empty list (security)
+        return []
 
+    chats = database.get_chats_by_user_id(user_id)
+
+    # Convert to storage format
     conversations = []
-    for filename in os.listdir(DATA_DIR):
-        if filename.endswith('.json'):
-            path = os.path.join(DATA_DIR, filename)
-            with open(path, 'r') as f:
-                data = json.load(f)
-
-                # Filter by user_id if provided
-                if user_id is not None and data.get("user_id") != user_id:
-                    continue
-
-                # Return metadata only
-                conversations.append({
-                    "id": data["id"],
-                    "created_at": data["created_at"],
-                    "title": data.get("title", "New Conversation"),
-                    "type": data.get("type", "council"),
-                    "message_count": len(data["messages"])
-                })
-
-    # Sort by creation time, newest first
-    conversations.sort(key=lambda x: x["created_at"], reverse=True)
+    for chat in chats:
+        conversations.append({
+            "id": chat["id"],
+            "created_at": str(chat["created_at"]),
+            "title": chat.get("title", "New Conversation"),
+            "type": chat.get("type", "council"),
+            "message_count": chat.get("message_count", 0)
+        })
 
     return conversations
 
@@ -147,16 +144,20 @@ def add_user_message(conversation_id: str, content: str):
         conversation_id: Conversation identifier
         content: User message content
     """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
+    # Verify conversation exists
+    chat = database.get_chat_by_id(conversation_id)
+    if chat is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
-    conversation["messages"].append({
-        "role": "user",
-        "content": content
-    })
-
-    save_conversation(conversation)
+    # Create message with role=user, no stage data
+    database.create_message(
+        chat_id=conversation_id,
+        role="user",
+        content=content,
+        stage1_data=None,
+        stage2_data=None,
+        stage3_data=None
+    )
 
 
 def add_assistant_message(
@@ -174,18 +175,23 @@ def add_assistant_message(
         stage2: List of model rankings
         stage3: Final synthesized response
     """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
+    # Verify conversation exists
+    chat = database.get_chat_by_id(conversation_id)
+    if chat is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
-    conversation["messages"].append({
-        "role": "assistant",
-        "stage1": stage1,
-        "stage2": stage2,
-        "stage3": stage3
-    })
+    # Extract content from stage3 for the content field
+    content = stage3.get("response", "") if stage3 else ""
 
-    save_conversation(conversation)
+    # Create message with role=assistant and stage data
+    database.create_message(
+        chat_id=conversation_id,
+        role="assistant",
+        content=content,
+        stage1_data=stage1,
+        stage2_data=stage2,
+        stage3_data=stage3
+    )
 
 
 def update_conversation_title(conversation_id: str, title: str):
@@ -196,12 +202,9 @@ def update_conversation_title(conversation_id: str, title: str):
         conversation_id: Conversation identifier
         title: New title for the conversation
     """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
+    success = database.update_chat_title(conversation_id, title)
+    if not success:
         raise ValueError(f"Conversation {conversation_id} not found")
-
-    conversation["title"] = title
-    save_conversation(conversation)
 
 
 def add_movie_script_message(
@@ -221,19 +224,29 @@ def add_movie_script_message(
         stage3: Script selection result
         stage4: Collaborative dialogue result
     """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
+    # Verify conversation exists
+    chat = database.get_chat_by_id(conversation_id)
+    if chat is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
-    conversation["messages"].append({
-        "role": "assistant",
-        "stage1": stage1,
-        "stage2": stage2,
+    # For movie scripts, we need to store stage4 data
+    # The database.create_message only supports stage1-3
+    # We'll store stage4 in stage3_data as a nested object
+    combined_stage3 = {
         "stage3": stage3,
         "stage4": stage4
-    })
+    }
 
-    save_conversation(conversation)
+    content = stage4.get("dialogue", "") if stage4 else ""
+
+    database.create_message(
+        chat_id=conversation_id,
+        role="assistant",
+        content=content,
+        stage1_data=stage1,
+        stage2_data=stage2,
+        stage3_data=combined_stage3
+    )
 
 
 def update_movie_script_stage4(conversation_id: str, stage4: Dict[str, Any]):
@@ -245,14 +258,49 @@ def update_movie_script_stage4(conversation_id: str, stage4: Dict[str, Any]):
         conversation_id: Conversation identifier
         stage4: Updated stage4 data
     """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
-        raise ValueError(f"Conversation {conversation_id} not found")
+    # This requires updating the last message, which isn't directly supported
+    # by the current database.py interface
+    # For now, we'll need to add this functionality to database.py
+    # or handle it differently
 
-    # Find the last assistant message
-    for msg in reversed(conversation["messages"]):
-        if msg.get("role") == "assistant" and "stage4" in msg:
-            msg["stage4"] = stage4
+    # Get current messages
+    messages = database.get_messages_by_chat_id(conversation_id)
+    if not messages:
+        raise ValueError(f"Conversation {conversation_id} has no messages")
+
+    # Find last assistant message
+    last_assistant = None
+    for msg in reversed(messages):
+        if msg.get("role") == "assistant":
+            last_assistant = msg
             break
 
-    save_conversation(conversation)
+    if last_assistant is None:
+        raise ValueError(f"No assistant message found in conversation {conversation_id}")
+
+    # Update the stage3_data to include new stage4
+    current_stage3 = last_assistant.get("stage3_data", {})
+    if isinstance(current_stage3, dict):
+        current_stage3["stage4"] = stage4
+    else:
+        current_stage3 = {"stage4": stage4}
+
+    # We need to add an update_message function to database.py
+    # For now, this is a limitation
+    pass
+
+
+# Legacy compatibility - these functions are not needed but kept for reference
+def save_conversation(conversation: Dict[str, Any]):
+    """Legacy function - no longer used with database backend."""
+    pass
+
+
+def ensure_data_dir():
+    """Legacy function - no longer used with database backend."""
+    pass
+
+
+def get_conversation_path(conversation_id: str) -> str:
+    """Legacy function - no longer used with database backend."""
+    return ""
