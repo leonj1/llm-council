@@ -2,10 +2,21 @@
 > Status: In Progress
 
 ## Root Request
-"Wire main.py to use database.py for MySQL persistence instead of storage.py for JSON file storage. Replace storage.create_conversation() with database.create_chat(), storage.add_user_message()/add_assistant_message() with database.create_message(). Handle schema differences: storage uses conversation_id vs database uses chat_id, storage stores full message object vs database has separate columns for content, stage1_data, stage2_data, stage3_data."
+"Add a collapse icon to each stage (stage 1, stage 2, etc.) that toggles collapse/expand of just the selected stage"
 
 ## Active Stack
-1. Wire MySQL Persistence (In Progress)
+1. Add Stage Collapse Icons (Decomposed)
+
+### Decomposition Justification for Task 1
+| Sub-Task | Traces To Root Term | Because |
+|----------|---------------------|---------|
+| 1.1 Create shared CollapseIcon component + CSS | "collapse icon" | Reusable icon component for all stages |
+| 1.2 Add collapse to Stage1 and Stage2 | "each stage" + "toggles collapse/expand" | Apply toggle to first two stages |
+| 1.3 Add collapse to Stage3 and Stage4 | "each stage" + "toggles collapse/expand" | Apply toggle to remaining stages |
+
+   1.1 Create shared CollapseIcon component + CSS (In Progress)
+   1.2 Add collapse to Stage1 and Stage2 (Pending)
+   1.3 Add collapse to Stage3 and Stage4 (Pending)
 
 ---
 
@@ -29,3 +40,5 @@
     - Chevron icon on each message
     - Collapsed state shows truncated preview
     - State managed per-message in ChatInterface.jsx
+- [x] Wire MySQL Persistence
+    - Replaced storage.py calls with database.py in main.py

@@ -209,3 +209,39 @@ Lines to modify in main.py: 25, 150, 227, 241, 281, 311, 519, 722
 Next: Invoking architect agent
 ---
 
+=== Session 20260108-215538 ===
+Workflow: architect
+Task: Add a collapse icon to each stage (stage 1, stage 2, etc.) that toggles collapse/expand of just the selected stage
+Status: Initialized
+
+Context: LLM Council chat app. Assistant messages contain multiple stages (Stage1, Stage2, Stage3, Stage4). User wants per-stage collapse/expand independent of message-level collapse.
+
+Tech Stack:
+  - Frontend: React 19, Vite 7, react-router-dom 7.11.0
+  - Backend: Python FastAPI on port 8004
+  - Styling: Plain CSS (no framework), primary color #4a90e2
+
+Key Files:
+  - /root/repo/frontend/src/components/Stage1.jsx (individual responses, has .stage-title h3)
+  - /root/repo/frontend/src/components/Stage2.jsx (peer rankings, has .stage-title h3)
+  - /root/repo/frontend/src/components/Stage3.jsx (final answer, has .stage-title h3)
+  - /root/repo/frontend/src/components/Stage4.jsx (movie script collab)
+  - /root/repo/frontend/src/components/Stage1.css (stage styling - .stage, .stage-title classes)
+  - /root/repo/frontend/src/components/ChatInterface.jsx (renders stages, already has CollapseIcon + collapse logic for messages)
+  - /root/repo/frontend/src/components/ChatInterface.css (has .collapse-toggle, .collapse-icon styles)
+
+Existing Pattern:
+  - CollapseIcon component in ChatInterface.jsx (chevron SVG)
+  - collapsedMessages state tracks collapsed state per message index
+  - toggleCollapse(index) function to toggle
+  - CSS: .collapse-toggle, .collapse-icon, .collapse-icon.collapsed (rotates -90deg)
+
+Implementation Approach:
+  - Add isCollapsed prop + onToggle callback to Stage components
+  - Or manage collapse state within each Stage component internally
+  - Add chevron icon next to .stage-title in each Stage component
+  - Reuse existing CSS patterns from ChatInterface.css
+
+Next: Invoking architect agent
+---
+
