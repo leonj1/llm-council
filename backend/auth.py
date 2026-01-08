@@ -101,16 +101,20 @@ async def google_callback(code: str = None, state: str = None, error: str = None
         name=name,
         picture_url=picture,
     )
-    if db_user:
-        print(f"User persisted to database: {email} (id={db_user['id']})")
 
-    # Create session
+    # Fail login if database persistence failed - user_id is required for all operations
+    if db_user is None:
+        return RedirectResponse(url=f"{FRONTEND_URL}?error=database_unavailable")
+
+    print(f"User persisted to database: {email} (id={db_user['id']})")
+
+    # Create session with guaranteed user_id
     session_id = secrets.token_urlsafe(32)
     sessions[session_id] = {
         "email": email,
         "name": name,
         "picture": picture,
-        "user_id": db_user["id"] if db_user else None,
+        "user_id": db_user["id"],
     }
 
     # Redirect to frontend with session
