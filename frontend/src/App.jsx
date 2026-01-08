@@ -16,6 +16,7 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showChat, setShowChat] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -610,6 +611,8 @@ function App() {
           onNewConversation={handleNewConversation}
           onDeleteConversation={handleDeleteConversation}
           isMobile={isMobile}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
       )}
       {showChatInterface && (
