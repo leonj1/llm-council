@@ -5,7 +5,18 @@
 "Add a collapse icon to each stage (stage 1, stage 2, etc.) that toggles collapse/expand of just the selected stage"
 
 ## Active Stack
-1. Add Stage Collapse Icons (Pending)
+1. Add Stage Collapse Icons (Decomposed)
+
+### Decomposition Justification for Task 1
+| Sub-Task | Traces To Root Term | Because |
+|----------|---------------------|---------|
+| 1.1 Create shared CollapseIcon component + CSS | "collapse icon" | Reusable icon component for all stages |
+| 1.2 Add collapse to Stage1 and Stage2 | "each stage" + "toggles collapse/expand" | Apply toggle to first two stages |
+| 1.3 Add collapse to Stage3 and Stage4 | "each stage" + "toggles collapse/expand" | Apply toggle to remaining stages |
+
+   1.1 Create shared CollapseIcon component + CSS (In Progress)
+   1.2 Add collapse to Stage1 and Stage2 (Pending)
+   1.3 Add collapse to Stage3 and Stage4 (Pending)
 
 ---
 
