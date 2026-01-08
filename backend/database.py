@@ -3,10 +3,24 @@
 import os
 import uuid
 import json
+import logging
 import mysql.connector
 from mysql.connector import Error
 from typing import Optional, List
 from contextlib import contextmanager
+
+# Set up verbose database logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Ensure we have a handler if not already configured
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(name)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
 
 def _get_db_config():
     """Get database configuration from environment at runtime.
@@ -27,10 +41,12 @@ def get_connection():
     """Create and return a MySQL connection."""
     try:
         config = _get_db_config()
+        logger.debug(f"DB CONNECT: Attempting connection to {config['host']}:{config['port']}/{config['database']}")
         connection = mysql.connector.connect(**config)
+        logger.info(f"DB CONNECT: Successfully connected to MySQL database '{config['database']}'")
         return connection
     except Error as e:
-        print(f"Error connecting to MySQL: {e}")
+        logger.error(f"DB CONNECT ERROR: Failed to connect to MySQL: {e}")
         return None
 
 
@@ -39,18 +55,23 @@ def get_db_cursor():
     """Context manager for database cursor with auto-commit."""
     connection = get_connection()
     if connection is None:
+        logger.warning("DB CURSOR: No database connection available, yielding None")
         yield None
         return
     try:
         cursor = connection.cursor(dictionary=True)
+        logger.debug("DB CURSOR: Created cursor, beginning transaction")
         yield cursor
         connection.commit()
+        logger.debug("DB CURSOR: Transaction committed successfully")
     except Error as e:
+        logger.error(f"DB CURSOR ERROR: Rolling back transaction due to: {e}")
         connection.rollback()
         raise e
     finally:
         cursor.close()
         connection.close()
+        logger.debug("DB CURSOR: Cursor and connection closed")
 
 
 def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Optional[str]) -> Optional[dict]:
@@ -58,12 +79,14 @@ def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Op
     Insert or update a user based on Google OAuth data.
     Returns the user record if successful, None otherwise.
     """
+    logger.info(f"DB UPSERT_USER: Starting upsert for google_id={google_id}, email={email}")
     with get_db_cursor() as cursor:
         if cursor is None:
-            print("Warning: Database not available, skipping user persistence")
+            logger.warning("DB UPSERT_USER: Database not available, skipping user persistence")
             return None
 
         # Try to find existing user by google_id
+        logger.debug(f"DB UPSERT_USER: Checking if user exists with google_id={google_id}")
         cursor.execute(
             "SELECT id, google_id, email, name, picture_url, created_at, updated_at FROM users WHERE google_id = %s",
             (google_id,)
@@ -72,6 +95,7 @@ def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Op
 
         if existing_user:
             # Update existing user
+            logger.info(f"DB UPDATE users: Updating existing user id={existing_user['id']}, google_id={google_id}")
             cursor.execute(
                 """
                 UPDATE users
@@ -80,14 +104,18 @@ def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Op
                 """,
                 (email, name, picture_url, google_id)
             )
+            logger.debug(f"DB UPDATE users: Rows affected={cursor.rowcount}")
             # Fetch updated record
             cursor.execute(
                 "SELECT id, google_id, email, name, picture_url, created_at, updated_at FROM users WHERE google_id = %s",
                 (google_id,)
             )
-            return cursor.fetchone()
+            result = cursor.fetchone()
+            logger.info(f"DB UPDATE users: Successfully updated user id={result['id']}")
+            return result
         else:
             # Insert new user
+            logger.info(f"DB INSERT users: Creating new user with google_id={google_id}, email={email}")
             cursor.execute(
                 """
                 INSERT INTO users (google_id, email, name, picture_url)
@@ -96,6 +124,7 @@ def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Op
                 (google_id, email, name, picture_url)
             )
             user_id = cursor.lastrowid
+            logger.info(f"DB INSERT users: New user created with id={user_id}")
             cursor.execute(
                 "SELECT id, google_id, email, name, picture_url, created_at, updated_at FROM users WHERE id = %s",
                 (user_id,)
@@ -105,6 +134,7 @@ def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Op
 
 def get_user_by_email(email: str) -> Optional[dict]:
     """Get a user by email address."""
+    logger.debug(f"DB SELECT users: Looking up user by email={email}")
     with get_db_cursor() as cursor:
         if cursor is None:
             return None
@@ -112,11 +142,14 @@ def get_user_by_email(email: str) -> Optional[dict]:
             "SELECT id, google_id, email, name, picture_url, created_at, updated_at FROM users WHERE email = %s",
             (email,)
         )
-        return cursor.fetchone()
+        result = cursor.fetchone()
+        logger.debug(f"DB SELECT users: Found={'yes' if result else 'no'} for email={email}")
+        return result
 
 
 def get_user_by_id(user_id: int) -> Optional[dict]:
     """Get a user by ID."""
+    logger.debug(f"DB SELECT users: Looking up user by id={user_id}")
     with get_db_cursor() as cursor:
         if cursor is None:
             return None
@@ -124,7 +157,9 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
             "SELECT id, google_id, email, name, picture_url, created_at, updated_at FROM users WHERE id = %s",
             (user_id,)
         )
-        return cursor.fetchone()
+        result = cursor.fetchone()
+        logger.debug(f"DB SELECT users: Found={'yes' if result else 'no'} for id={user_id}")
+        return result
 
 
 def create_chat(user_id: int) -> Optional[dict]:
@@ -136,26 +171,32 @@ def create_chat(user_id: int) -> Optional[dict]:
 
     Returns the created chat record if successful, None otherwise.
     """
+    logger.info(f"DB CREATE_CHAT: Starting chat creation for user_id={user_id}")
     with get_db_cursor() as cursor:
         if cursor is None:
-            print("Warning: Database not available, skipping chat creation")
+            logger.warning("DB CREATE_CHAT: Database not available, skipping chat creation")
             return None
 
         # Generate UUID for chat id
         chat_id = str(uuid.uuid4())
+        logger.debug(f"DB CREATE_CHAT: Generated chat_id={chat_id}")
 
         # Insert new chat with default title and type
+        logger.info(f"DB INSERT chats: Creating chat id={chat_id} for user_id={user_id}")
         cursor.execute(
             "INSERT INTO chats (id, user_id, title, type) VALUES (%s, %s, %s, %s)",
             (chat_id, user_id, "New Conversation", "council")
         )
+        logger.debug(f"DB INSERT chats: Rows affected={cursor.rowcount}")
 
         # Fetch created record
         cursor.execute(
             "SELECT id, user_id, title, type, created_at FROM chats WHERE id = %s",
             (chat_id,)
         )
-        return cursor.fetchone()
+        result = cursor.fetchone()
+        logger.info(f"DB INSERT chats: Successfully created chat id={chat_id}")
+        return result
 
 
 def get_chats_by_user_id(user_id: int) -> List[dict]:
@@ -163,6 +204,7 @@ def get_chats_by_user_id(user_id: int) -> List[dict]:
     Get all chats for the given user with message counts.
     Returns a list of chat records, empty list if none found or database unavailable.
     """
+    logger.debug(f"DB SELECT chats: Fetching all chats for user_id={user_id}")
     with get_db_cursor() as cursor:
         if cursor is None:
             return []
@@ -181,6 +223,7 @@ def get_chats_by_user_id(user_id: int) -> List[dict]:
             (user_id,)
         )
         result = cursor.fetchall()
+        logger.debug(f"DB SELECT chats: Found {len(result) if result else 0} chats for user_id={user_id}")
         return result if result else []
 
 
@@ -189,6 +232,7 @@ def get_chat_by_id(chat_id: str) -> Optional[dict]:
     Get a single chat by ID.
     Returns the chat record if found, None otherwise.
     """
+    logger.debug(f"DB SELECT chats: Looking up chat by id={chat_id}")
     with get_db_cursor() as cursor:
         if cursor is None:
             return None
@@ -197,7 +241,9 @@ def get_chat_by_id(chat_id: str) -> Optional[dict]:
             "SELECT id, user_id, title, type, created_at FROM chats WHERE id = %s",
             (chat_id,)
         )
-        return cursor.fetchone()
+        result = cursor.fetchone()
+        logger.debug(f"DB SELECT chats: Found={'yes' if result else 'no'} for id={chat_id}")
+        return result
 
 
 def create_message(
@@ -221,12 +267,18 @@ def create_message(
 
     Returns the created message record if successful, None otherwise.
     """
+    content_preview = content[:50] + "..." if len(content) > 50 else content
+    logger.info(f"DB CREATE_MESSAGE: Starting message creation for chat_id={chat_id}, role={role}")
+    logger.debug(f"DB CREATE_MESSAGE: Content preview: '{content_preview}'")
+    logger.debug(f"DB CREATE_MESSAGE: stage1_data={'present' if stage1_data else 'None'}, stage2_data={'present' if stage2_data else 'None'}, stage3_data={'present' if stage3_data else 'None'}")
+
     with get_db_cursor() as cursor:
         if cursor is None:
-            print("Warning: Database not available, skipping message creation")
+            logger.warning("DB CREATE_MESSAGE: Database not available, skipping message creation")
             return None
 
         # Insert new message with JSON serialization for stage data
+        logger.info(f"DB INSERT messages: Creating {role} message for chat_id={chat_id}")
         cursor.execute(
             """
             INSERT INTO messages (chat_id, role, content, stage1_data, stage2_data, stage3_data)
@@ -243,6 +295,8 @@ def create_message(
         )
 
         message_id = cursor.lastrowid
+        logger.info(f"DB INSERT messages: Successfully created message id={message_id} for chat_id={chat_id}")
+        logger.debug(f"DB INSERT messages: Rows affected={cursor.rowcount}")
 
         # Fetch created record
         cursor.execute(
@@ -275,6 +329,7 @@ def get_messages_by_chat_id(chat_id: str) -> List[dict]:
 
     Returns a list of message records ordered by created_at ascending, empty list if none found or database unavailable.
     """
+    logger.debug(f"DB SELECT messages: Fetching all messages for chat_id={chat_id}")
     with get_db_cursor() as cursor:
         if cursor is None:
             return []
@@ -300,6 +355,7 @@ def get_messages_by_chat_id(chat_id: str) -> List[dict]:
                 if message['stage3_data']:
                     message['stage3_data'] = json.loads(message['stage3_data'])
 
+        logger.debug(f"DB SELECT messages: Found {len(messages) if messages else 0} messages for chat_id={chat_id}")
         return messages if messages else []
 
 
@@ -312,6 +368,7 @@ def get_message_by_id(message_id: int) -> Optional[dict]:
 
     Returns the message record if found with deserialized JSON fields, None otherwise.
     """
+    logger.debug(f"DB SELECT messages: Looking up message by id={message_id}")
     with get_db_cursor() as cursor:
         if cursor is None:
             return None
@@ -334,6 +391,7 @@ def get_message_by_id(message_id: int) -> Optional[dict]:
             if message['stage3_data']:
                 message['stage3_data'] = json.loads(message['stage3_data'])
 
+        logger.debug(f"DB SELECT messages: Found={'yes' if message else 'no'} for id={message_id}")
         return message
 
 
@@ -347,9 +405,10 @@ def update_chat_title(chat_id: str, title: str) -> bool:
 
     Returns True if chat was updated, False otherwise.
     """
+    logger.info(f"DB UPDATE_CHAT_TITLE: Updating title for chat_id={chat_id} to '{title}'")
     with get_db_cursor() as cursor:
         if cursor is None:
-            print("Warning: Database not available, skipping chat title update")
+            logger.warning("DB UPDATE_CHAT_TITLE: Database not available, skipping chat title update")
             return False
 
         cursor.execute(
@@ -358,7 +417,12 @@ def update_chat_title(chat_id: str, title: str) -> bool:
         )
 
         # Check if any rows were affected
-        return cursor.rowcount > 0
+        success = cursor.rowcount > 0
+        if success:
+            logger.info(f"DB UPDATE chats: Successfully updated title for chat_id={chat_id}, rows_affected={cursor.rowcount}")
+        else:
+            logger.warning(f"DB UPDATE chats: No chat found with id={chat_id}, rows_affected=0")
+        return success
 
 
 def delete_chat(chat_id: str) -> bool:
@@ -371,9 +435,10 @@ def delete_chat(chat_id: str) -> bool:
 
     Returns True if chat was deleted, False otherwise.
     """
+    logger.info(f"DB DELETE_CHAT: Starting deletion for chat_id={chat_id}")
     with get_db_cursor() as cursor:
         if cursor is None:
-            print("Warning: Database not available, skipping chat deletion")
+            logger.warning("DB DELETE_CHAT: Database not available, skipping chat deletion")
             return False
 
         cursor.execute(
@@ -382,4 +447,9 @@ def delete_chat(chat_id: str) -> bool:
         )
 
         # Check if any rows were affected
-        return cursor.rowcount > 0
+        success = cursor.rowcount > 0
+        if success:
+            logger.info(f"DB DELETE chats: Successfully deleted chat_id={chat_id} (messages cascade-deleted), rows_affected={cursor.rowcount}")
+        else:
+            logger.warning(f"DB DELETE chats: No chat found with id={chat_id}, rows_affected=0")
+        return success
