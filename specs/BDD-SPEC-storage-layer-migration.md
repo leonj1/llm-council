@@ -2,139 +2,83 @@
 
 ## Overview
 
-This specification defines the behavior for migrating chat persistence from JSON file storage (`storage.py`) to MySQL database storage (`database.py`). The new `chat_storage.py` module wraps database operations with user authorization and provides a consistent interface for chat and message management.
+Wire main.py to use database.py for MySQL persistence instead of storage.py for JSON file storage. This spec covers the direct replacement of storage function calls with database function calls, including schema translation between API conventions (conversation_id) and database conventions (chat_id).
 
 ## User Stories
 
-- As a user of the LLM Council application, I want my chats to be created and stored persistently so that I can access them across sessions
-- As a user, I want to retrieve my stored chats so that I can continue previous conversations
-- As a user, I want my chats to be private and isolated from other users so that my conversations remain confidential
-- As a user, I want to store and retrieve messages in my chats so that my conversation history is preserved
-- As a user, I want to delete my chats so that I can manage my conversation history
-- As a user, I want the deliberation stage data to be fully preserved so that I can review the complete council process later
+- As a user of the LLM Council, I want my conversations stored in the database so that my chat history persists reliably
 
 ## Feature Files
 
 | Feature File | Scenarios | Coverage |
 |--------------|-----------|----------|
-| chat-storage-creation.feature | 4 | Happy path, chat types, error handling |
-| chat-storage-retrieval.feature | 4 | Get by ID, list chats, not found, empty list |
-| chat-storage-user-isolation.feature | 4 | Cross-user access prevention |
-| chat-storage-messages.feature | 5 | User/assistant messages, retrieval, errors |
-| chat-storage-deletion.feature | 4 | Delete, cascade, verification |
-| chat-storage-stage-data.feature | 5 | Stage 1/2/3 persistence, nested structures |
+| main-database-wiring.feature | 4 | Create, user message, assistant message, retrieve |
 
 ## Scenarios Summary
 
-### chat-storage-creation.feature
-1. User creates a new chat successfully
-2. User creates a council-type chat
-3. User creates a movie script chat
-4. Chat creation fails when storage is unavailable
+### main-database-wiring.feature
 
-### chat-storage-retrieval.feature
-1. User retrieves their own chat by identifier
-2. User retrieves a chat that does not exist
-3. User lists all their chats
-4. User with no chats lists their chats
+1. **Create conversation stores to database**
+   - Validates that POST /api/conversations uses database.create_chat()
+   - Response contains conversation identifier (translated from chat_id)
 
-### chat-storage-user-isolation.feature
-1. User cannot retrieve another user's chat
-2. User cannot see another user's chats in their list
-3. User cannot add messages to another user's chat
-4. User cannot delete another user's chat
+2. **Add user message stores with user role**
+   - Validates that user messages are stored via database.create_message()
+   - Role is "user", content is the message text
+   - No stage data for user messages (all stage columns null)
 
-### chat-storage-messages.feature
-1. User message is added to chat
-2. Assistant message with stage data is added to chat
-3. User retrieves all messages from a chat
-4. User retrieves messages from empty chat
-5. Adding message to non-existent chat fails
+3. **Add assistant message stores stage data separately**
+   - Validates that assistant messages unpack stage data into separate columns
+   - stage1_data, stage2_data, stage3_data stored in their respective columns
+   - Content field contains the final synthesized answer from stage3
 
-### chat-storage-deletion.feature
-1. User deletes their own chat
-2. User attempts to delete a non-existent chat
-3. Deleted chat is no longer retrievable
-4. Deleted chat no longer appears in chat list
-
-### chat-storage-stage-data.feature
-1. Stage one model responses are preserved
-2. Stage two rankings are preserved
-3. Stage three synthesis is preserved
-4. All stages are retrieved together
-5. Stage data with complex nested structures is preserved
+4. **Get conversation retrieves from database**
+   - Validates that GET /api/conversations/{id} uses database.get_chat_by_id()
+   - Messages retrieved via database.get_messages_by_chat_id()
+   - Response uses "id" field (API convention, not "chat_id")
 
 ## Acceptance Criteria
 
-### Chat Creation
-- Chats are saved to MySQL via database.py
-- Each chat has a unique UUID identifier
-- Chats are associated with a user_id
-- Default title is "New Conversation"
-- Chat type can be "council" or "movie_script"
-- Returns None when database unavailable
+### Create Conversation
+- [ ] database.create_chat() is called instead of storage.create_conversation()
+- [ ] Response translates chat_id to conversation_id for API compatibility
 
-### Chat Retrieval
-- Get chat by ID returns chat with user association and timestamp
-- Returns None for non-existent chat IDs
-- List chats returns all chats for requesting user only
-- List includes title, type, and message_count
-- Results ordered by creation time (newest first)
-- Empty list returned when user has no chats
+### Add User Message
+- [ ] database.create_message() is called with role="user"
+- [ ] content parameter contains the user's message
+- [ ] stage1_data, stage2_data, stage3_data are all None
 
-### User Isolation
-- Users cannot access other users' chats
-- Cross-user retrieval returns None (not error)
-- Cross-user message addition fails with authorization error
-- Cross-user deletion returns failure indicator
-- List only shows chats owned by requesting user
+### Add Assistant Message
+- [ ] database.create_message() is called with role="assistant"
+- [ ] stage1_data contains the stage 1 model responses
+- [ ] stage2_data contains the stage 2 rankings
+- [ ] stage3_data contains the stage 3 synthesis
+- [ ] content contains stage3["response"] or equivalent final answer
 
-### Message Persistence
-- User messages saved with role "user" and content
-- Assistant messages saved with role "assistant" and stage data
-- Stage 1, 2, 3 data preserved as JSON
-- Messages retrievable in chronological order
-- Empty list returned for chat with no messages
-- Adding to non-existent chat returns failure
+### Get Conversation
+- [ ] database.get_chat_by_id() is called instead of storage.get_conversation()
+- [ ] database.get_messages_by_chat_id() retrieves all messages
+- [ ] Response format matches existing API contract (id, not chat_id)
 
-### Chat Deletion
-- Delete removes chat and all messages (cascade)
-- Returns success indicator on successful delete
-- Returns failure indicator for non-existent chat
-- Deleted chat not retrievable afterward
-- Deleted chat not in list afterward
+## Schema Translation Reference
 
-### Stage Data Integrity
-- Stage 1: Model responses with identifiers preserved
-- Stage 2: Ranking evaluations and parsed rankings preserved
-- Stage 3: Synthesized response and chairman output preserved
-- Complex nested structures preserved without corruption
-- All stages retrievable together in single message
+| API/Storage Convention | Database Convention |
+|------------------------|---------------------|
+| conversation_id | chat_id |
+| conversation | chat |
+| message["content"] | content param |
+| message["stage1"] | stage1_data param |
+| message["stage2"] | stage2_data param |
+| message["stage3"] | stage3_data param |
 
-## Schema Mapping
+## What This Spec Does NOT Include
 
-| storage.py (JSON) | database.py (MySQL) | Notes |
-|-------------------|---------------------|-------|
-| conversation_id | chat_id | Renamed |
-| messages[] array | messages table | Separate table |
-| message.stage1 | stage1_data column | JSON serialized |
-| message.stage2 | stage2_data column | JSON serialized |
-| message.stage3 | stage3_data column | JSON serialized |
-
-## Dependencies
-
-- `backend/database.py` - Existing MySQL operations
-- `backend/storage.py` - Kept for backward compatibility (not modified)
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| backend/chat_storage.py | MySQL-backed storage with user authorization |
-| backend/tests/test_chat_storage.py | Unit tests for chat_storage module |
+Per user request, the following are explicitly excluded:
+- User isolation logic
+- Chat deletion
+- Chat types/titles
+- Error handling beyond existing
 
 ## Ready For
 
-- **gherkin-to-test** agent: Convert scenarios to test prompts
-- **test-creator** agent: Write pytest tests from Gherkin
-- **coder** agent: Implement chat_storage.py to pass tests
+- gherkin-to-test agent

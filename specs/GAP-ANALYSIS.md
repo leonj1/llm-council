@@ -1,107 +1,131 @@
-# Gap Analysis: Conversation Ownership Validation
+# Gap Analysis: Storage Layer Migration
 
-## Analysis Date: 2026-01-06
+## Analysis Date: 2026-01-07
 
 ## Executive Summary
-Add ownership tracking and validation to conversation endpoints. User must only access their own conversations. Existing auth patterns (sessions, get_current_user) can be reused. Storage layer needs user_id field.
+
+Wire main.py to use database.py for MySQL persistence instead of storage.py for JSON file storage. The database module is FULLY IMPLEMENTED. Only wiring changes needed in main.py.
 
 ## Root Request Trace
-> "Add user_id to conversation storage", "Validate ownership in GET /api/conversations/{id}", "Filter conversation list by authenticated user"
+> "Wire main.py to use database.py", "Store conversations in MySQL", "Replace JSON file storage"
 
 ## Existing Code to Reuse
 
-### 1. Authentication Layer (`backend/auth.py`)
-| Component | Purpose | Reuse |
-|-----------|---------|-------|
-| `sessions: dict` | In-memory session store | Direct reuse |
-| `get_current_user()` | Extract user from session cookie | Convert to dependency |
-| `@router.get("/me")` | Returns user info from session | Pattern for auth checks |
+### 1. Database Layer (backend/database.py) - COMPLETE
 
-**Pattern**: Session cookie `session_id` maps to user dict in `sessions`
-
-### 2. Database Layer (`backend/database.py`)
-| Function | Purpose | Reuse |
+| Function | Purpose | Ready |
 |----------|---------|-------|
-| `get_chat_by_id()` | Returns chat with `user_id` | Pattern for ownership check |
-| `get_chats_by_user_id()` | Filter by user | Pattern for list filtering |
-| `create_chat(user_id)` | Associates chat with user | Pattern for creation |
+| `create_chat(user_id)` | Create conversation | YES |
+| `get_chat_by_id(chat_id)` | Get conversation | YES |
+| `get_chats_by_user_id(user_id)` | List conversations | YES |
+| `create_message(chat_id, role, content, s1, s2, s3)` | Store message | YES |
+| `get_messages_by_chat_id(chat_id)` | Get messages | YES |
+| `delete_chat(chat_id)` | Delete conversation | YES |
 
-### 3. Storage Layer (`backend/storage.py`)
-| Function | Purpose | Modification Needed |
-|----------|---------|---------------------|
-| `create_conversation()` | Creates new conversation | Add `user_id` param |
-| `get_conversation()` | Load single conversation | No change (check ownership in main.py) |
-| `list_conversations()` | List all conversations | Add `user_id` filter param |
+### 2. Storage Layer (backend/storage.py) - TO BE REPLACED
 
-## Similar Patterns Already Implemented
+| Current Function | Database Replacement |
+|------------------|---------------------|
+| `storage.create_conversation(id, user_id, type)` | `database.create_chat(user_id)` |
+| `storage.get_conversation(id)` | `database.get_chat_by_id(id)` + `get_messages_by_chat_id(id)` |
+| `storage.list_conversations(user_id)` | `database.get_chats_by_user_id(user_id)` |
+| `storage.add_user_message(id, content)` | `database.create_message(id, 'user', content, None, None, None)` |
+| `storage.add_assistant_message(id, s1, s2, s3)` | `database.create_message(id, 'assistant', content, s1, s2, s3)` |
+| `storage.delete_conversation(id)` | `database.delete_chat(id)` |
 
-| Existing Pattern | New Equivalent |
-|------------------|----------------|
-| `get_chats_by_user_id(user_id)` | `list_conversations(user_id)` |
-| `get_chat_by_id() -> {user_id}` | `get_conversation() -> {user_id}` |
-| `auth.get_current_user()` | FastAPI Dependency for endpoints |
+## Schema Translation
 
-## Code Needing Refactoring
+### API Convention vs Database Convention
 
-**None** - Extend existing patterns, no breaking changes
+| API | Database |
+|-----|----------|
+| `conversation_id` | `chat_id` |
+| `conversation` | `chat` |
+| `message.stage1` | `stage1_data` |
+| `message.stage2` | `stage2_data` |
+| `message.stage3` | `stage3_data` |
+
+### Response Format Translation
+
+**API expects**:
+```json
+{
+  "id": "uuid",
+  "created_at": "timestamp",
+  "title": "string",
+  "type": "council",
+  "messages": [...]
+}
+```
+
+**Database returns**:
+```json
+{
+  "id": "uuid",
+  "user_id": 123,
+  "created_at": "datetime"
+}
+```
+
+**Translation**: Build response inline in main.py endpoints.
+
+## Code Needing Modification
+
+### main.py - Endpoint Changes
+
+| Line | Endpoint | Current | Target |
+|------|----------|---------|--------|
+| 140 | GET /conversations | `storage.list_conversations` | `database.get_chats_by_user_id` |
+| 150 | POST /conversations | `storage.create_conversation` | `database.create_chat` |
+| 157 | GET /conversations/{id} | `storage.get_conversation` | `database.get_chat_by_id` + messages |
+| 179 | DELETE /conversations/{id} | `storage.delete_conversation` | `database.delete_chat` |
+| 227 | POST /{id}/message | `storage.add_user_message` | `database.create_message` |
+| 241 | POST /{id}/message | `storage.add_assistant_message` | `database.create_message` |
 
 ## New Components to Build
 
-### 1. Auth Dependency (`backend/auth.py`)
-```python
-from fastapi import Depends, Request
+**None** - All database functions exist. Only wiring changes.
 
-async def require_auth(request: Request) -> dict:
-    """FastAPI dependency for authenticated endpoints."""
-    session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in sessions:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return sessions[session_id]
-```
+## Out of Scope (Per BDD Spec)
 
-### 2. Storage Modifications (`backend/storage.py`)
-| Change | Description |
-|--------|-------------|
-| `create_conversation(id, type, user_id)` | Add user_id to conversation dict |
-| `list_conversations(user_id)` | Filter by user_id |
-| Conversation JSON | Add `user_id` field |
-
-### 3. Endpoint Modifications (`backend/main.py`)
-| Endpoint | Change |
-|----------|--------|
-| `POST /api/conversations` | Inject auth, pass user_id to storage |
-| `GET /api/conversations` | Inject auth, filter by user_id |
-| `GET /api/conversations/{id}` | Inject auth, verify ownership (403 if mismatch) |
-| `DELETE /api/conversations/{id}` | Inject auth, verify ownership |
-| `POST /api/conversations/{id}/message` | Inject auth, verify ownership |
-
-### 4. Error Responses
-| Condition | HTTP Status | Response |
-|-----------|-------------|----------|
-| No session cookie | 401 | "Not authenticated" |
-| Invalid session | 401 | "Not authenticated" |
-| Conversation not found | 404 | "Conversation not found" |
-| User doesn't own conversation | 403 | "Access denied" |
+- Title storage (DB has no title column)
+- Conversation type (DB has no type column)
+- User isolation logic
+- Error handling beyond existing
 
 ## Refactoring Decision
 
 **Refactoring Needed**: No
-**Scope**: N/A
-**Risk**: N/A
+**Reason**: Direct function call replacement only
 
 ## GO Signal
 
 **STATUS: GO**
 
 Rationale:
-1. No refactoring required
-2. Extend auth.py with FastAPI dependency
-3. Add user_id to storage.py functions
-4. Add auth checks to main.py endpoints
-5. All patterns already exist in codebase
+1. database.py is complete and tested
+2. No structural refactoring required
+3. Direct wiring changes in main.py
+4. Schema translation is straightforward
 
 ## Implementation Order
-1. Add `require_auth` dependency to auth.py
-2. Modify storage.py to include user_id
-3. Update main.py endpoints with auth + ownership checks
-4. Write tests for all 6 BDD scenarios
+
+1. Replace storage import with database import
+2. Update create_conversation endpoint
+3. Update get_conversation endpoint
+4. Update send_message endpoint (user + assistant messages)
+5. Update delete_conversation endpoint
+6. Update list_conversations endpoint
+
+## Files to Modify
+
+| File | Action |
+|------|--------|
+| `backend/main.py` | Replace storage calls with database calls |
+
+## Files to Keep Unchanged
+
+| File | Reason |
+|------|--------|
+| `backend/database.py` | Already complete |
+| `backend/storage.py` | Keep as fallback |

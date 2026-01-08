@@ -23,6 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger("llm-council")
 
 from . import storage
+from . import database
 from .auth import router as auth_router, require_auth
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 from .movie_script import (
@@ -137,7 +138,18 @@ async def get_db_config(user: dict = Depends(require_auth)):
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
 async def list_conversations(user: dict = Depends(require_auth)):
     """List conversations for the authenticated user (metadata only)."""
-    return storage.list_conversations(user_id=user["user_id"])
+    chats = database.get_chats_by_user_id(user["user_id"])
+    # Transform database format to API format
+    return [
+        {
+            "id": chat["id"],
+            "created_at": str(chat["created_at"]),
+            "title": chat["title"],
+            "type": chat["type"],
+            "message_count": chat["message_count"]
+        }
+        for chat in chats
+    ]
 
 
 @app.post("/api/conversations", response_model=Conversation)
@@ -145,38 +157,67 @@ async def create_conversation(
     user: dict = Depends(require_auth)
 ):
     """Create a new conversation for the authenticated user."""
-    conversation_id = str(uuid.uuid4())
-    conversation_type = "council"  # Default type
-    conversation = storage.create_conversation(conversation_id, user["user_id"], conversation_type)
-    return conversation
+    chat = database.create_chat(user["user_id"])
+    return {
+        "id": chat["id"],
+        "created_at": str(chat["created_at"]),
+        "title": chat["title"],
+        "type": chat["type"],
+        "messages": []
+    }
 
 
 @app.get("/api/conversations/{conversation_id}", response_model=Conversation)
 async def get_conversation(conversation_id: str, user: dict = Depends(require_auth)):
     """Get a specific conversation with all its messages (ownership enforced)."""
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
+    chat = database.get_chat_by_id(conversation_id)
+    if chat is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Check ownership
-    if conversation.get("user_id") != user["user_id"]:
+    if chat.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return conversation
+    # Get messages for this chat
+    messages = database.get_messages_by_chat_id(conversation_id)
+
+    # Transform messages from database format to API format
+    api_messages = []
+    for msg in messages:
+        if msg["role"] == "user":
+            api_messages.append({
+                "role": "user",
+                "content": msg["content"]
+            })
+        else:  # assistant
+            api_messages.append({
+                "role": "assistant",
+                "stage1": msg.get("stage1_data"),
+                "stage2": msg.get("stage2_data"),
+                "stage3": msg.get("stage3_data")
+            })
+
+    return {
+        "id": chat["id"],
+        "created_at": str(chat["created_at"]),
+        "title": chat["title"],
+        "type": chat["type"],
+        "messages": api_messages
+    }
 
 
 @app.delete("/api/conversations/{conversation_id}")
 async def delete_conversation(conversation_id: str, user: dict = Depends(require_auth)):
     """Delete a specific conversation (ownership enforced)."""
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
+    chat = database.get_chat_by_id(conversation_id)
+    if chat is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Check ownership
-    if conversation.get("user_id") != user["user_id"]:
+    if chat.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    success = storage.delete_conversation(conversation_id)
+    success = database.delete_chat(conversation_id)
     return {"status": "deleted", "id": conversation_id}
 
 
@@ -209,27 +250,42 @@ async def send_message(conversation_id: str, request: SendMessageRequest, user: 
     Returns the complete response with all stages.
     """
     # Check if conversation exists
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
+    chat = database.get_chat_by_id(conversation_id)
+    if chat is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Check ownership
-    if conversation.get("user_id") != user["user_id"]:
+    if chat.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Check if this is the first message
-    is_first_message = len(conversation["messages"]) == 0
+    # Get existing messages to check if this is first message and build history
+    messages = database.get_messages_by_chat_id(conversation_id)
+    is_first_message = len(messages) == 0
+
+    # Transform messages to API format for history extraction
+    api_messages = []
+    for msg in messages:
+        if msg["role"] == "user":
+            api_messages.append({
+                "role": "user",
+                "content": msg["content"]
+            })
+        else:  # assistant
+            api_messages.append({
+                "role": "assistant",
+                "stage3": msg.get("stage3_data")
+            })
 
     # Extract conversation history for follow-up queries
-    conversation_history = extract_conversation_history(conversation.get("messages", []))
+    conversation_history = extract_conversation_history(api_messages)
 
     # Add user message
-    storage.add_user_message(conversation_id, request.content)
+    database.create_message(conversation_id, "user", request.content, None, None, None)
 
     # If this is the first message, generate a title
     if is_first_message:
         title = await generate_conversation_title(request.content)
-        storage.update_conversation_title(conversation_id, title)
+        database.update_chat_title(conversation_id, title)
 
     # Run the 3-stage council process
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
@@ -237,9 +293,14 @@ async def send_message(conversation_id: str, request: SendMessageRequest, user: 
         conversation_history if conversation_history else None
     )
 
+    # Extract content from stage3 for message storage
+    content = stage3_result.get("response", "") if stage3_result else ""
+
     # Add assistant message with all stages
-    storage.add_assistant_message(
+    database.create_message(
         conversation_id,
+        "assistant",
+        content,
         stage1_results,
         stage2_results,
         stage3_result
@@ -261,24 +322,39 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest,
     Returns Server-Sent Events as each stage completes.
     """
     # Check if conversation exists
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
+    chat = database.get_chat_by_id(conversation_id)
+    if chat is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Check ownership
-    if conversation.get("user_id") != user["user_id"]:
+    if chat.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Check if this is the first message
-    is_first_message = len(conversation["messages"]) == 0
+    # Get existing messages to check if this is first message and build history
+    messages = database.get_messages_by_chat_id(conversation_id)
+    is_first_message = len(messages) == 0
+
+    # Transform messages to API format for history extraction
+    api_messages = []
+    for msg in messages:
+        if msg["role"] == "user":
+            api_messages.append({
+                "role": "user",
+                "content": msg["content"]
+            })
+        else:  # assistant
+            api_messages.append({
+                "role": "assistant",
+                "stage3": msg.get("stage3_data")
+            })
 
     # Extract conversation history for follow-up queries
-    conversation_history = extract_conversation_history(conversation.get("messages", []))
+    conversation_history = extract_conversation_history(api_messages)
 
     async def event_generator():
         try:
             # Add user message
-            storage.add_user_message(conversation_id, request.content)
+            database.create_message(conversation_id, "user", request.content, None, None, None)
 
             # Start title generation in parallel (don't await yet)
             title_task = None
@@ -304,12 +380,17 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest,
             # Wait for title generation if it was started
             if title_task:
                 title = await title_task
-                storage.update_conversation_title(conversation_id, title)
+                database.update_chat_title(conversation_id, title)
                 yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
+            # Extract content from stage3 for message storage
+            content = stage3_result.get("response", "") if stage3_result else ""
+
             # Save complete assistant message
-            storage.add_assistant_message(
+            database.create_message(
                 conversation_id,
+                "assistant",
+                content,
                 stage1_results,
                 stage2_results,
                 stage3_result

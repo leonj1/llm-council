@@ -130,6 +130,10 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
 def create_chat(user_id: int) -> Optional[dict]:
     """
     Create a new chat for the given user.
+
+    Args:
+        user_id: ID of the user creating the chat
+
     Returns the created chat record if successful, None otherwise.
     """
     with get_db_cursor() as cursor:
@@ -140,15 +144,15 @@ def create_chat(user_id: int) -> Optional[dict]:
         # Generate UUID for chat id
         chat_id = str(uuid.uuid4())
 
-        # Insert new chat
+        # Insert new chat with default title and type
         cursor.execute(
-            "INSERT INTO chats (id, user_id) VALUES (%s, %s)",
-            (chat_id, user_id)
+            "INSERT INTO chats (id, user_id, title, type) VALUES (%s, %s, %s, %s)",
+            (chat_id, user_id, "New Conversation", "council")
         )
 
         # Fetch created record
         cursor.execute(
-            "SELECT id, user_id, created_at FROM chats WHERE id = %s",
+            "SELECT id, user_id, title, type, created_at FROM chats WHERE id = %s",
             (chat_id,)
         )
         return cursor.fetchone()
@@ -156,15 +160,24 @@ def create_chat(user_id: int) -> Optional[dict]:
 
 def get_chats_by_user_id(user_id: int) -> List[dict]:
     """
-    Get all chats for the given user.
+    Get all chats for the given user with message counts.
     Returns a list of chat records, empty list if none found or database unavailable.
     """
     with get_db_cursor() as cursor:
         if cursor is None:
             return []
 
+        # Get chats with message counts via LEFT JOIN
         cursor.execute(
-            "SELECT id, user_id, created_at FROM chats WHERE user_id = %s ORDER BY created_at DESC",
+            """
+            SELECT c.id, c.user_id, c.title, c.type, c.created_at,
+                   COUNT(m.id) as message_count
+            FROM chats c
+            LEFT JOIN messages m ON c.id = m.chat_id
+            WHERE c.user_id = %s
+            GROUP BY c.id, c.user_id, c.title, c.type, c.created_at
+            ORDER BY c.created_at DESC
+            """,
             (user_id,)
         )
         result = cursor.fetchall()
@@ -181,7 +194,7 @@ def get_chat_by_id(chat_id: str) -> Optional[dict]:
             return None
 
         cursor.execute(
-            "SELECT id, user_id, created_at FROM chats WHERE id = %s",
+            "SELECT id, user_id, title, type, created_at FROM chats WHERE id = %s",
             (chat_id,)
         )
         return cursor.fetchone()
@@ -322,6 +335,30 @@ def get_message_by_id(message_id: int) -> Optional[dict]:
                 message['stage3_data'] = json.loads(message['stage3_data'])
 
         return message
+
+
+def update_chat_title(chat_id: str, title: str) -> bool:
+    """
+    Update the title of a chat.
+
+    Args:
+        chat_id: UUID of the chat to update
+        title: New title for the chat
+
+    Returns True if chat was updated, False otherwise.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            print("Warning: Database not available, skipping chat title update")
+            return False
+
+        cursor.execute(
+            "UPDATE chats SET title = %s WHERE id = %s",
+            (title, chat_id)
+        )
+
+        # Check if any rows were affected
+        return cursor.rowcount > 0
 
 
 def delete_chat(chat_id: str) -> bool:
