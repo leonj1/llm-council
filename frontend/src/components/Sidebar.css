@@ -48,13 +48,18 @@
 .collapse-toggle-btn {
   background: none;
   border: none;
-  padding: 4px 8px;
+  padding: 8px 12px;
+  min-width: 44px;
+  min-height: 44px;
   font-size: 18px;
   color: #666;
   cursor: pointer;
   border-radius: 4px;
   transition: all 0.2s;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .collapse-toggle-btn:hover {
