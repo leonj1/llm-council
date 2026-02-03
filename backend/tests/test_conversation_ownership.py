@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from ..main import app
 from ..auth import sessions
 from .. import storage
+from .. import database
 
 
 client = TestClient(app)
@@ -20,13 +21,23 @@ client = TestClient(app)
 
 @pytest.fixture
 def alice_session():
-    """Create session for alice@example.com"""
+    """Create session for alice@example.com with real database user."""
+    # Create actual user in database
+    alice_user = database.upsert_user(
+        google_id="alice_google_id",
+        email="alice@example.com",
+        name="Alice",
+        picture_url=None
+    )
+    if alice_user is None:
+        pytest.skip("Database not available")
+
     session_id = "alice_session_123"
     sessions[session_id] = {
         "email": "alice@example.com",
         "name": "Alice",
         "picture": None,
-        "user_id": 1,
+        "user_id": alice_user["id"],
     }
     yield session_id, sessions[session_id]
     # Cleanup
@@ -36,13 +47,23 @@ def alice_session():
 
 @pytest.fixture
 def bob_session():
-    """Create session for bob@example.com"""
+    """Create session for bob@example.com with real database user."""
+    # Create actual user in database
+    bob_user = database.upsert_user(
+        google_id="bob_google_id",
+        email="bob@example.com",
+        name="Bob",
+        picture_url=None
+    )
+    if bob_user is None:
+        pytest.skip("Database not available")
+
     session_id = "bob_session_456"
     sessions[session_id] = {
         "email": "bob@example.com",
         "name": "Bob",
         "picture": None,
-        "user_id": 2,
+        "user_id": bob_user["id"],
     }
     yield session_id, sessions[session_id]
     # Cleanup
