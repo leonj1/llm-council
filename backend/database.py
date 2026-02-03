@@ -90,7 +90,7 @@ def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Op
         # Try to find existing user by google_id
         logger.debug(f"DB UPSERT_USER: Checking if user exists with google_id={google_id}")
         cursor.execute(
-            "SELECT id, google_id, email, name, picture_url, status, created_at, updated_at FROM users WHERE google_id = %s",
+            "SELECT id, google_id, email, name, picture_url, status, role, created_at, updated_at FROM users WHERE google_id = %s",
             (google_id,)
         )
         existing_user = cursor.fetchone()
@@ -109,11 +109,11 @@ def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Op
             logger.debug(f"DB UPDATE users: Rows affected={cursor.rowcount}")
             # Fetch updated record
             cursor.execute(
-                "SELECT id, google_id, email, name, picture_url, status, created_at, updated_at FROM users WHERE google_id = %s",
+                "SELECT id, google_id, email, name, picture_url, status, role, created_at, updated_at FROM users WHERE google_id = %s",
                 (google_id,)
             )
             result = cursor.fetchone()
-            logger.info(f"DB UPDATE users: Successfully updated user id={result['id']}, status={result['status']}")
+            logger.info(f"DB UPDATE users: Successfully updated user id={result['id']}, status={result['status']}, role={result['role']}")
             return result
         else:
             # Insert new user (status defaults to 'pending' via schema)
@@ -128,7 +128,7 @@ def upsert_user(google_id: str, email: str, name: Optional[str], picture_url: Op
             user_id = cursor.lastrowid
             logger.info(f"DB INSERT users: New user created with id={user_id}")
             cursor.execute(
-                "SELECT id, google_id, email, name, picture_url, status, created_at, updated_at FROM users WHERE id = %s",
+                "SELECT id, google_id, email, name, picture_url, status, role, created_at, updated_at FROM users WHERE id = %s",
                 (user_id,)
             )
             return cursor.fetchone()
@@ -141,7 +141,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
         if cursor is None:
             return None
         cursor.execute(
-            "SELECT id, google_id, email, name, picture_url, status, created_at, updated_at FROM users WHERE email = %s",
+            "SELECT id, google_id, email, name, picture_url, status, role, created_at, updated_at FROM users WHERE email = %s",
             (email,)
         )
         result = cursor.fetchone()
@@ -156,7 +156,7 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
         if cursor is None:
             return None
         cursor.execute(
-            "SELECT id, google_id, email, name, picture_url, status, created_at, updated_at FROM users WHERE id = %s",
+            "SELECT id, google_id, email, name, picture_url, status, role, created_at, updated_at FROM users WHERE id = %s",
             (user_id,)
         )
         result = cursor.fetchone()
@@ -192,6 +192,39 @@ def update_user_status(user_id: int, status: str) -> bool:
         success = cursor.rowcount > 0
         if success:
             logger.info(f"DB UPDATE users: Successfully updated status for user_id={user_id}, rows_affected={cursor.rowcount}")
+        else:
+            logger.warning(f"DB UPDATE users: No user found with id={user_id}, rows_affected=0")
+        return success
+
+
+def update_user_role(user_id: int, role: str) -> bool:
+    """
+    Update the role of a user.
+    
+    Args:
+        user_id: ID of the user to update
+        role: New role ('user', 'moderator', 'admin', or 'superadmin')
+    
+    Returns:
+        True if user was updated, False otherwise.
+    """
+    if role not in ('user', 'moderator', 'admin', 'superadmin'):
+        raise ValueError(f"Invalid role: {role}. Must be 'user', 'moderator', 'admin', or 'superadmin'")
+    
+    logger.info(f"DB UPDATE_USER_ROLE: Updating role for user_id={user_id} to '{role}'")
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            logger.warning("DB UPDATE_USER_ROLE: Database not available, skipping role update")
+            return False
+        
+        cursor.execute(
+            "UPDATE users SET role = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+            (role, user_id)
+        )
+        
+        success = cursor.rowcount > 0
+        if success:
+            logger.info(f"DB UPDATE users: Successfully updated role for user_id={user_id}, rows_affected={cursor.rowcount}")
         else:
             logger.warning(f"DB UPDATE users: No user found with id={user_id}, rows_affected=0")
         return success
