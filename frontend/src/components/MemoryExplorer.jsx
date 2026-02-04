@@ -72,7 +72,10 @@ export default function MemoryExplorer() {
   };
 
   const handleSearch = async (e) => {
-    e.preventDefault();
+    // Prevent default form submission (important for both button click and Enter key)
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
     
     if (!query.trim()) {
       toast.warning('Please enter a search query');
@@ -161,9 +164,10 @@ export default function MemoryExplorer() {
             onChange={(e) => setQuery(e.target.value)}
           />
           <button 
-            type="submit" 
+            type="button" 
             className="search-btn"
             disabled={isLoading}
+            onClick={handleSearch}
           >
             {isLoading ? 'Searching...' : 'Search'}
           </button>
