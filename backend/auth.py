@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 import httpx
 
-from .database import upsert_user
+from .database import upsert_user, get_user_by_id
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -132,12 +132,25 @@ async def google_callback(code: str = None, state: str = None, error: str = None
 
 @router.get("/me")
 async def get_current_user(request: Request):
-    """Get current user from session."""
+    """Get current user from session.
+    
+    Always refreshes the role from the database to ensure role changes
+    are immediately reflected without requiring re-login.
+    """
     session_id = request.cookies.get("session_id")
     if not session_id or session_id not in sessions:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    return sessions[session_id]
+    session = sessions[session_id]
+    
+    # Refresh role from database to pick up any role changes
+    if "user_id" in session:
+        db_user = get_user_by_id(session["user_id"])
+        if db_user:
+            # Update session with current role from database
+            session["role"] = db_user.get("role", "user")
+    
+    return session
 
 
 @router.post("/logout")
