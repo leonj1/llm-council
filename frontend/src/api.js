@@ -299,6 +299,34 @@ export const api = {
   // ===== Memory Explorer API (Admin Only) =====
 
   /**
+   * Helper to extract error details from a response.
+   * Tries to parse JSON error body, falls back to status text.
+   */
+  async _extractError(response, defaultMessage) {
+    let errorMessage = defaultMessage;
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorBody = await response.json();
+        // Handle various API error formats
+        errorMessage = errorBody.detail || errorBody.message || errorBody.error || defaultMessage;
+      } else {
+        // Try to get text if not JSON
+        const text = await response.text();
+        if (text && text.length < 200) {
+          errorMessage = text;
+        }
+      }
+    } catch {
+      // If we can't parse the response, use default
+    }
+    const error = new Error(errorMessage);
+    error.status = response.status;
+    error.statusText = response.statusText;
+    return error;
+  },
+
+  /**
    * Get list of agents with memories.
    * Requires admin or superadmin role.
    */
@@ -307,9 +335,7 @@ export const api = {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = new Error('Failed to get agents');
-      error.status = response.status;
-      throw error;
+      throw await this._extractError(response, 'Failed to get agents');
     }
     return response.json();
   },
@@ -335,9 +361,7 @@ export const api = {
       body: JSON.stringify(params),
     });
     if (!response.ok) {
-      const error = new Error('Failed to search memories');
-      error.status = response.status;
-      throw error;
+      throw await this._extractError(response, 'Failed to search memories');
     }
     return response.json();
   },
@@ -352,9 +376,7 @@ export const api = {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = new Error('Failed to get memory');
-      error.status = response.status;
-      throw error;
+      throw await this._extractError(response, 'Failed to get memory');
     }
     return response.json();
   },

@@ -1,6 +1,35 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
+import { useToast } from './Toast';
 import './MemoryExplorer.css';
+
+/**
+ * Format error message with HTTP status details
+ */
+function formatErrorMessage(err) {
+  // Check for network errors
+  if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+    return 'Network error: Unable to connect to the server. Please check your connection.';
+  }
+
+  // Check for HTTP status codes
+  if (err.status) {
+    const statusMessages = {
+      400: 'Bad Request: Invalid search parameters',
+      401: 'Unauthorized: Please log in again',
+      403: 'Forbidden: You do not have permission to access memories',
+      404: 'Not Found: The memory API endpoint was not found',
+      429: 'Too Many Requests: Please wait a moment and try again',
+      500: 'Server Error: Something went wrong on the server',
+      502: 'Bad Gateway: Server is temporarily unavailable',
+      503: 'Service Unavailable: Server is under maintenance',
+    };
+    const statusMsg = statusMessages[err.status] || `HTTP ${err.status}`;
+    return err.message ? `${statusMsg}: ${err.message}` : statusMsg;
+  }
+
+  return err.message || 'An unexpected error occurred';
+}
 
 export default function MemoryExplorer() {
   // Search state
@@ -20,6 +49,9 @@ export default function MemoryExplorer() {
   const [isLoadingAgents, setIsLoadingAgents] = useState(true);
   const [error, setError] = useState(null);
 
+  // Toast notifications
+  const toast = useToast();
+
   // Load agents on mount
   useEffect(() => {
     loadAgents();
@@ -32,7 +64,8 @@ export default function MemoryExplorer() {
       setAgents(agentList);
     } catch (err) {
       console.error('Failed to load agents:', err);
-      // Don't block the UI if agents fail to load
+      // Show toast but don't block the UI
+      toast.warning('Could not load agent list. You can still search manually.');
     } finally {
       setIsLoadingAgents(false);
     }
@@ -42,7 +75,7 @@ export default function MemoryExplorer() {
     e.preventDefault();
     
     if (!query.trim()) {
-      setError('Please enter a search query');
+      toast.warning('Please enter a search query');
       return;
     }
 
@@ -72,11 +105,22 @@ export default function MemoryExplorer() {
         tags: tagList.length > 0 ? tagList : undefined,
       });
 
-      setResults(searchResults.results || searchResults || []);
+      const resultArray = searchResults.results || searchResults || [];
+      setResults(resultArray);
+      
+      // Show success toast
+      if (resultArray.length > 0) {
+        toast.success(`Found ${resultArray.length} memor${resultArray.length === 1 ? 'y' : 'ies'}`);
+      } else {
+        toast.info('No memories found matching your search');
+      }
     } catch (err) {
       console.error('Search failed:', err);
-      setError(err.message || 'Failed to search memories');
-      setResults([]);
+      const errorMessage = formatErrorMessage(err);
+      setError(errorMessage);
+      toast.error(errorMessage);
+      // IMPORTANT: Do NOT clear results on error - keep previous results visible
+      // setResults([]); <- removed to preserve existing results
     } finally {
       setIsLoading(false);
     }
