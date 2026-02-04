@@ -25,6 +25,7 @@ logger = logging.getLogger("llm-council")
 from . import storage
 from . import database
 from .auth import router as auth_router, require_auth
+from .memory import router as memory_router
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 from .movie_script import (
     stage1_generate_scripts,
@@ -50,6 +51,9 @@ app.add_middleware(
 
 # Include auth router
 app.include_router(auth_router)
+
+# Include memory router (admin-only)
+app.include_router(memory_router)
 
 
 class CreateConversationRequest(BaseModel):

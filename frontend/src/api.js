@@ -295,4 +295,67 @@ export const api = {
 
     return response.json();
   },
+
+  // ===== Memory Explorer API (Admin Only) =====
+
+  /**
+   * Get list of agents with memories.
+   * Requires admin or superadmin role.
+   */
+  async getMemoryAgents() {
+    const response = await fetch(`${API_BASE}/api/memories/agents`, {
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = new Error('Failed to get agents');
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  },
+
+  /**
+   * Search memories.
+   * Requires admin or superadmin role.
+   * @param {Object} params - Search parameters
+   * @param {string} params.query - Search query
+   * @param {string} params.scope - Scope: "network", "mine", or "agent:agent-name"
+   * @param {number} params.limit - Max results (default 20)
+   * @param {string} params.agent_id - Optional agent ID for X-Agent-ID header
+   * @param {string} params.project_id - Optional project ID filter
+   * @param {string[]} params.tags - Optional tags filter
+   */
+  async searchMemories(params) {
+    const response = await fetch(`${API_BASE}/api/memories/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(params),
+    });
+    if (!response.ok) {
+      const error = new Error('Failed to search memories');
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  },
+
+  /**
+   * Get a specific memory by ID.
+   * Requires admin or superadmin role.
+   * @param {string} memoryId - Memory ID
+   */
+  async getMemory(memoryId) {
+    const response = await fetch(`${API_BASE}/api/memories/${memoryId}`, {
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = new Error('Failed to get memory');
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  },
 };

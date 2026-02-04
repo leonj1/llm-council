@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { api } from '../api';
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -11,10 +13,26 @@ export default function Sidebar({
   collapsed,
   onToggleCollapse,
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [showDropdown, setShowDropdown] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const dropdownRef = useRef(null);
   const menuRef = useRef(null);
+
+  // Check user role for admin features
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const user = await api.getCurrentUser();
+        setUserRole(user.role || 'user');
+      } catch {
+        setUserRole(null);
+      }
+    };
+    fetchUserRole();
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -163,6 +181,31 @@ export default function Sidebar({
           ))
         )}
       </div>
+
+      {/* Admin Navigation */}
+      {(userRole === 'admin' || userRole === 'superadmin') && !collapsed && (
+        <div className="sidebar-admin-nav">
+          <div className="admin-nav-label">Admin</div>
+          <button
+            className={`admin-nav-item ${location.pathname === '/memories' ? 'active' : ''}`}
+            onClick={() => navigate('/memories')}
+          >
+            <span className="admin-nav-icon">🧠</span>
+            <span className="admin-nav-text">Memory Explorer</span>
+          </button>
+        </div>
+      )}
+      {(userRole === 'admin' || userRole === 'superadmin') && collapsed && (
+        <div className="sidebar-admin-nav collapsed">
+          <button
+            className={`admin-nav-item collapsed ${location.pathname === '/memories' ? 'active' : ''}`}
+            onClick={() => navigate('/memories')}
+            title="Memory Explorer"
+          >
+            <span className="admin-nav-icon">🧠</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
