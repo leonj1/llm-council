@@ -1,6 +1,6 @@
 .stage3-movie-script {
-  background: #f0f8ff;
-  border-color: #b3d9ff;
+  background: var(--bg-active);
+  border-color: var(--border-user-message);
 }
 
 .selection-summary {
@@ -31,38 +31,38 @@
 }
 
 .winner-model {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 14px;
   font-style: italic;
 }
 
 .selection-rationale {
-  background: #ffffff;
+  background: var(--bg-primary);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
-  border: 1px solid #d4e8ff;
+  border: 1px solid var(--border-user-message);
 }
 
 .selection-rationale h4 {
   margin: 0 0 12px 0;
   font-size: 14px;
-  color: #4a90e2;
+  color: var(--accent-primary);
   font-weight: 600;
 }
 
 .collaborators-preview {
-  background: #ffffff;
+  background: var(--bg-primary);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
-  border: 1px solid #d4e8ff;
+  border: 1px solid var(--border-user-message);
 }
 
 .collaborators-preview h4 {
   margin: 0 0 12px 0;
   font-size: 14px;
-  color: #4a90e2;
+  color: var(--accent-primary);
   font-weight: 600;
 }
 
@@ -84,15 +84,15 @@
 }
 
 .collaborator-tag.author {
-  background: #e8f4fd;
-  color: #1976d2;
-  border: 1px solid #90caf9;
+  background: var(--info-author-bg);
+  color: var(--info-author-text);
+  border: 1px solid var(--info-author-border);
 }
 
 .collaborator-tag.collaborator {
-  background: #e8f5e9;
-  color: #388e3c;
-  border: 1px solid #a5d6a7;
+  background: var(--info-collab-bg);
+  color: var(--info-collab-text);
+  border: 1px solid var(--info-collab-border);
 }
 
 .role-label {
@@ -104,15 +104,15 @@
 }
 
 .plus {
-  color: #999;
+  color: var(--text-muted);
   font-size: 18px;
   font-weight: 300;
 }
 
 .winning-script-details {
-  background: #ffffff;
+  background: var(--bg-primary);
   border-radius: 8px;
-  border: 1px solid #d4e8ff;
+  border: 1px solid var(--border-user-message);
   overflow: hidden;
 }
 
@@ -120,28 +120,29 @@
   padding: 12px 16px;
   cursor: pointer;
   font-weight: 500;
-  color: #4a90e2;
-  background: #f8fbff;
-  border-bottom: 1px solid #d4e8ff;
+  color: var(--accent-primary);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-user-message);
   user-select: none;
 }
 
 .winning-script-details summary:hover {
-  background: #f0f7ff;
+  background: var(--bg-active);
 }
 
 .winning-script-details[open] summary {
-  border-bottom: 1px solid #d4e8ff;
+  border-bottom: 1px solid var(--border-user-message);
 }
 
 .winning-script-content {
   padding: 16px;
   max-height: 400px;
   overflow-y: auto;
+  color: var(--text-primary);
 }
 
 .winning-script-content pre {
-  background: #f5f5f5;
+  background: var(--bg-code);
   padding: 12px;
   border-radius: 6px;
   overflow-x: auto;

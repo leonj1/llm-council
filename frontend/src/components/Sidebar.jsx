@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api';
+import { useTheme } from '../ThemeContext';
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -15,6 +16,7 @@ export default function Sidebar({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [userRole, setUserRole] = useState(null);
@@ -72,16 +74,28 @@ export default function Sidebar({
       <div className="sidebar-header">
         <div className="sidebar-header-top">
           {!collapsed && <h1>LLM Council</h1>}
-          {!isMobile && (
-            <button
-              className="collapse-toggle-btn"
-              onClick={onToggleCollapse}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {collapsed ? '»' : '«'}
-            </button>
-          )}
+          <div className="header-actions">
+            {!collapsed && (
+              <button
+                className="theme-toggle-btn"
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </button>
+            )}
+            {!isMobile && (
+              <button
+                className="collapse-toggle-btn"
+                onClick={onToggleCollapse}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {collapsed ? '»' : '«'}
+              </button>
+            )}
+          </div>
         </div>
         {!collapsed && (
           <div className="new-conversation-dropdown" ref={dropdownRef}>

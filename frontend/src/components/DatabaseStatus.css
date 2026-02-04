@@ -15,32 +15,32 @@
 }
 
 .db-status-connected {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .db-status-connected .db-status-dot {
-  background: #4caf50;
-  box-shadow: 0 0 4px #4caf50;
+  background: var(--success);
+  box-shadow: 0 0 4px var(--success);
 }
 
 .db-status-disconnected {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .db-status-disconnected .db-status-dot {
-  background: #f44336;
-  box-shadow: 0 0 4px #f44336;
+  background: var(--danger);
+  box-shadow: 0 0 4px var(--danger);
 }
 
 .db-status-checking {
-  background: #fff3e0;
-  color: #e65100;
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 
 .db-status-checking .db-status-dot {
-  background: #ff9800;
+  background: var(--warning);
   animation: pulse 1s infinite;
 }
 
@@ -60,7 +60,7 @@
 
 .db-status-clickable:hover {
   transform: scale(1.02);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px var(--shadow-sm);
 }
 
 .db-status-clickable:active {

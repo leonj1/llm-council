@@ -7,6 +7,119 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Light theme (default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f8f8;
+  --bg-tertiary: #f5f5f5;
+  --bg-hover: #f0f0f0;
+  --bg-input: #ffffff;
+  --bg-code: #f5f5f5;
+  --bg-user-message: #f0f7ff;
+  --bg-active: #e8f0fe;
+  --bg-admin: #f0f0f0;
+  
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-tertiary: #888888;
+  --text-muted: #999999;
+  
+  --border-primary: #e0e0e0;
+  --border-secondary: #d0d0d0;
+  --border-user-message: #d0e7ff;
+  --border-active: #4a90e2;
+  
+  --accent-primary: #4a90e2;
+  --accent-hover: #357abd;
+  --accent-bg: rgba(74, 144, 226, 0.1);
+  --accent-bg-hover: rgba(74, 144, 226, 0.15);
+  
+  --danger: #dc3545;
+  --danger-bg: #fff0f0;
+  
+  --success: #2d8a2d;
+  --success-bg: #f0fff0;
+  --success-border: #c8e6c8;
+  
+  --warning: #d97706;
+  --warning-bg: #fff8f0;
+  --warning-border: #ffd4b3;
+  --warning-light: #fef3c7;
+  
+  --info-author-bg: #e3f2fd;
+  --info-author-text: #1565c0;
+  --info-author-border: #1976d2;
+  --info-collab-bg: #e8f5e9;
+  --info-collab-text: #2e7d32;
+  --info-collab-border: #388e3c;
+  
+  --accent-teal: #4a90a4;
+  --accent-teal-hover: #3d7a8c;
+  --accent-purple: #7c3aed;
+  
+  --shadow-sm: rgba(0, 0, 0, 0.05);
+  --shadow-md: rgba(0, 0, 0, 0.15);
+  
+  --table-row-even: #fafafa;
+  --blockquote-border: #ddd;
+  --blockquote-text: #666;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #242424;
+  --bg-tertiary: #2a2a2a;
+  --bg-hover: #333333;
+  --bg-input: #2a2a2a;
+  --bg-code: #2a2a2a;
+  --bg-user-message: #1e3a5f;
+  --bg-active: #1e3a5f;
+  --bg-admin: #2a2a2a;
+  
+  --text-primary: #e8e8e8;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #909090;
+  --text-muted: #707070;
+  
+  --border-primary: #3a3a3a;
+  --border-secondary: #4a4a4a;
+  --border-user-message: #2a4a6a;
+  --border-active: #4a90e2;
+  
+  --accent-primary: #5a9ff2;
+  --accent-hover: #4a8fe2;
+  --accent-bg: rgba(90, 159, 242, 0.15);
+  --accent-bg-hover: rgba(90, 159, 242, 0.25);
+  
+  --danger: #e45562;
+  --danger-bg: #3a2020;
+  
+  --success: #4ade80;
+  --success-bg: #1a2e1a;
+  --success-border: #2a4a2a;
+  
+  --warning: #f59e0b;
+  --warning-bg: #2a2015;
+  --warning-border: #4a3520;
+  --warning-light: #3a2a15;
+  
+  --info-author-bg: #1a2a3a;
+  --info-author-text: #60a5fa;
+  --info-author-border: #3b82f6;
+  --info-collab-bg: #1a2e1a;
+  --info-collab-text: #4ade80;
+  --info-collab-border: #22c55e;
+  
+  --accent-teal: #5baebf;
+  --accent-teal-hover: #4a9db0;
+  --accent-purple: #a78bfa;
+  
+  --shadow-sm: rgba(0, 0, 0, 0.2);
+  --shadow-md: rgba(0, 0, 0, 0.4);
+  
+  --table-row-even: #252525;
+  --blockquote-border: #444;
+  --blockquote-text: #999;
 }
 
 * {
@@ -19,7 +132,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #root {
@@ -70,7 +185,7 @@ body {
 }
 
 .markdown-content pre {
-  background: #f5f5f5;
+  background: var(--bg-code);
   padding: 12px;
   border-radius: 4px;
   overflow-x: auto;
@@ -78,7 +193,7 @@ body {
 }
 
 .markdown-content code {
-  background: #f5f5f5;
+  background: var(--bg-code);
   padding: 2px 6px;
   border-radius: 3px;
   font-family: monospace;
@@ -93,8 +208,8 @@ body {
 .markdown-content blockquote {
   margin: 0 0 12px 0;
   padding-left: 16px;
-  border-left: 4px solid #ddd;
-  color: #666;
+  border-left: 4px solid var(--blockquote-border);
+  color: var(--blockquote-text);
 }
 
 .markdown-content table {
@@ -106,21 +221,21 @@ body {
 
 .markdown-content th,
 .markdown-content td {
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-primary);
   padding: 10px 12px;
   text-align: left;
   vertical-align: top;
 }
 
 .markdown-content th {
-  background: #f0f0f0;
+  background: var(--bg-hover);
   font-weight: 600;
 }
 
 .markdown-content tr:nth-child(even) {
-  background: #fafafa;
+  background: var(--table-row-even);
 }
 
 .markdown-content tr:hover {
-  background: #f5f5f5;
+  background: var(--bg-tertiary);
 }

@@ -12,9 +12,9 @@
 }
 
 .db-config-modal {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px var(--shadow-md);
   width: 90%;
   max-width: 450px;
   max-height: 90vh;
@@ -26,28 +26,28 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .db-config-header h2 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .db-config-close {
   background: none;
   border: none;
   font-size: 24px;
-  color: #666;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 0;
   line-height: 1;
 }
 
 .db-config-close:hover {
-  color: #333;
+  color: var(--text-primary);
 }
 
 .db-config-body {
@@ -57,14 +57,14 @@
 .db-config-loading {
   text-align: center;
   padding: 20px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .db-config-error {
   text-align: center;
   padding: 20px;
-  color: #c62828;
-  background: #ffebee;
+  color: var(--danger);
+  background: var(--danger-bg);
   border-radius: 4px;
 }
 
@@ -74,7 +74,7 @@
 }
 
 .db-config-table tr {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--bg-hover);
 }
 
 .db-config-table tr:last-child {
@@ -88,17 +88,17 @@
 
 .db-config-label {
   font-weight: 500;
-  color: #666;
+  color: var(--text-secondary);
   width: 100px;
 }
 
 .db-config-table code {
-  background: #f5f5f5;
+  background: var(--bg-code);
   padding: 4px 8px;
   border-radius: 4px;
   font-family: 'SF Mono', Monaco, Consolas, monospace;
   font-size: 13px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .db-config-status {
@@ -112,8 +112,8 @@
 }
 
 .db-config-status.connected {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .db-config-status.connected::before {
@@ -121,12 +121,12 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #4caf50;
+  background: var(--success);
 }
 
 .db-config-status.disconnected {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .db-config-status.disconnected::before {
@@ -134,5 +134,5 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #f44336;
+  background: var(--danger);
 }

@@ -1,6 +1,6 @@
 .stage4 {
-  background: #fff8f0;
-  border-color: #ffd4b3;
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
 }
 
 .collaborators-info {
@@ -10,13 +10,13 @@
   flex-wrap: wrap;
   margin-bottom: 16px;
   padding: 12px;
-  background: #ffffff;
+  background: var(--bg-primary);
   border-radius: 8px;
-  border: 1px solid #ffe4cc;
+  border: 1px solid var(--warning-border);
 }
 
 .collab-label {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -28,22 +28,22 @@
 }
 
 .model-tag.author {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: var(--info-author-bg);
+  color: var(--info-author-text);
 }
 
 .model-tag.collaborator {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--info-collab-bg);
+  color: var(--info-collab-text);
 }
 
 .and {
-  color: #999;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .turns-count {
-  color: #999;
+  color: var(--text-muted);
   font-size: 12px;
   margin-left: 8px;
 }
@@ -56,18 +56,18 @@
 
 .control-btn {
   padding: 6px 12px;
-  background: #fff;
-  border: 1px solid #ddd;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .control-btn:hover {
-  background: #f5f5f5;
-  border-color: #ccc;
+  background: var(--bg-tertiary);
+  border-color: var(--border-primary);
 }
 
 .dialogue-timeline {
@@ -81,7 +81,7 @@
 .round-header {
   font-size: 12px;
   font-weight: 600;
-  color: #d97706;
+  color: var(--warning);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 8px;
@@ -89,19 +89,19 @@
 }
 
 .dialogue-entry {
-  background: #ffffff;
+  background: var(--bg-primary);
   border-radius: 8px;
   margin-bottom: 8px;
   overflow: hidden;
-  border: 1px solid #eee;
+  border: 1px solid var(--border-primary);
 }
 
 .dialogue-entry.author {
-  border-left: 3px solid #1976d2;
+  border-left: 3px solid var(--info-author-border);
 }
 
 .dialogue-entry.collaborator {
-  border-left: 3px solid #388e3c;
+  border-left: 3px solid var(--info-collab-border);
 }
 
 .entry-header {
@@ -109,19 +109,19 @@
   align-items: center;
   padding: 12px;
   cursor: pointer;
-  background: #fafafa;
+  background: var(--bg-secondary);
   transition: background 0.2s;
 }
 
 .entry-header:hover {
-  background: #f0f0f0;
+  background: var(--bg-hover);
 }
 
 .entry-model {
   flex: 1;
   font-weight: 500;
   font-size: 14px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .entry-role {
@@ -134,18 +134,18 @@
 }
 
 .dialogue-entry.author .entry-role {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: var(--info-author-bg);
+  color: var(--info-author-text);
 }
 
 .dialogue-entry.collaborator .entry-role {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--info-collab-bg);
+  color: var(--info-collab-text);
 }
 
 .expand-icon {
   font-size: 18px;
-  color: #999;
+  color: var(--text-muted);
   font-weight: 300;
   width: 24px;
   text-align: center;
@@ -153,9 +153,10 @@
 
 .entry-content {
   padding: 16px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-primary);
   font-size: 14px;
   line-height: 1.6;
+  color: var(--text-primary);
 }
 
 .dialogue-loading {
@@ -164,16 +165,16 @@
   justify-content: center;
   gap: 12px;
   padding: 24px;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
 .dialogue-loading.inline {
   justify-content: flex-start;
   padding: 12px;
-  background: #fff;
+  background: var(--bg-primary);
   border-radius: 8px;
-  border: 1px dashed #ddd;
+  border: 1px dashed var(--border-secondary);
 }
 
 .spinner.small {
@@ -183,9 +184,9 @@
 }
 
 .refined-script-section {
-  background: #ffffff;
+  background: var(--bg-primary);
   border-radius: 8px;
-  border: 2px solid #d97706;
+  border: 2px solid var(--warning);
   overflow: hidden;
 }
 
@@ -195,10 +196,10 @@
   gap: 8px;
   margin: 0;
   padding: 14px 16px;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  background: var(--warning-light);
   font-size: 16px;
   font-weight: 600;
-  color: #92400e;
+  color: var(--warning);
 }
 
 .script-icon {
@@ -211,10 +212,11 @@
   overflow-y: auto;
   font-size: 14px;
   line-height: 1.7;
+  color: var(--text-primary);
 }
 
 .refined-script-content pre {
-  background: #f5f5f5;
+  background: var(--bg-code);
   padding: 12px;
   border-radius: 6px;
   overflow-x: auto;
@@ -224,7 +226,7 @@
 .refined-script-content h1,
 .refined-script-content h2,
 .refined-script-content h3 {
-  color: #333;
+  color: var(--text-primary);
   margin-top: 24px;
   margin-bottom: 12px;
 }
@@ -238,7 +240,7 @@
 .regenerate-btn {
   margin-left: auto;
   padding: 6px 14px;
-  background: #dc2626;
+  background: var(--danger);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -249,11 +251,11 @@
 }
 
 .regenerate-btn:hover:not(:disabled) {
-  background: #b91c1c;
+  opacity: 0.9;
 }
 
 .regenerate-btn:disabled {
-  background: #9ca3af;
+  background: var(--text-muted);
   cursor: not-allowed;
 }
 
@@ -261,7 +263,7 @@
   margin-left: auto;
   padding: 6px 10px;
   background: transparent;
-  border: 1px solid #d97706;
+  border: 1px solid var(--warning);
   border-radius: 6px;
   cursor: pointer;
   font-size: 16px;
@@ -273,7 +275,7 @@
 }
 
 .copy-btn:hover {
-  background: rgba(217, 119, 6, 0.1);
+  background: var(--warning-bg);
 }
 
 .copy-btn:active {
@@ -286,7 +288,7 @@
   justify-content: center;
   gap: 12px;
   padding: 40px;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -296,8 +298,8 @@
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  background: #fef9e7;
-  border-bottom: 1px solid #f0e6c8;
+  background: var(--warning-light);
+  border-bottom: 1px solid var(--warning-border);
   flex-wrap: wrap;
 }
 
@@ -312,18 +314,18 @@
 }
 
 .validation-badge.compliant {
-  background: #d4edda;
-  color: #155724;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .validation-badge.too_short {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--warning-light);
+  color: var(--warning);
 }
 
 .validation-badge.too_long {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .validation-text {
@@ -332,12 +334,12 @@
 
 .word-count {
   font-size: 11px;
-  color: #666;
+  color: var(--text-secondary);
   font-weight: normal;
 }
 
 .refinement-note {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--text-tertiary);
   font-style: italic;
 }
