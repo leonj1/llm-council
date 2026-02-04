@@ -7,6 +7,7 @@ import Stage3MovieScript from './Stage3MovieScript';
 import Stage4 from './Stage4';
 import DatabaseStatus from './DatabaseStatus';
 import DbConfigModal from './DbConfigModal';
+import RoleIndicator from './RoleIndicator';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -94,10 +95,14 @@ export default function ChatInterface({
               ‹ Back
             </button>
             <h2>LLM Council</h2>
-            <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
+            <div className="header-status-group">
+              <RoleIndicator />
+              <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
+            </div>
           </div>
         ) : (
           <div className="desktop-header">
+            <RoleIndicator />
             <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
           </div>
         )}
@@ -118,10 +123,14 @@ export default function ChatInterface({
             ‹ Back
           </button>
           <h2>{conversation.title || 'New Conversation'}</h2>
-          <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
+          <div className="header-status-group">
+            <RoleIndicator />
+            <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
+          </div>
         </div>
       ) : (
         <div className="desktop-header">
+          <RoleIndicator />
           <DatabaseStatus onClick={() => setShowDbConfigModal(true)} isLoggedIn={true} />
         </div>
       )}

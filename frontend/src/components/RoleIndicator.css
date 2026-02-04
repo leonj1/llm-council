@@ -1,0 +1,31 @@
+.role-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  position: relative;
+}
+
+.role-icon {
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.9;
+  transition: opacity 0.2s ease;
+}
+
+.role-indicator:hover .role-icon {
+  opacity: 1;
+}
+
+/* Subtle glow for admin roles */
+.role-superadmin .role-icon {
+  filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.5));
+}
+
+.role-admin .role-icon {
+  filter: drop-shadow(0 0 2px rgba(100, 149, 237, 0.5));
+}
+
+.role-moderator .role-icon {
+  filter: drop-shadow(0 0 2px rgba(255, 193, 7, 0.4));
+}

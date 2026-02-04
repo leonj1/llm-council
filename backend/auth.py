@@ -108,13 +108,14 @@ async def google_callback(code: str = None, state: str = None, error: str = None
 
     print(f"User persisted to database: {email} (id={db_user['id']})")
 
-    # Create session with guaranteed user_id
+    # Create session with guaranteed user_id and role
     session_id = secrets.token_urlsafe(32)
     sessions[session_id] = {
         "email": email,
         "name": name,
         "picture": picture,
         "user_id": db_user["id"],
+        "role": db_user.get("role", "user"),
     }
 
     # Redirect to frontend with session

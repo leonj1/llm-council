@@ -9,6 +9,21 @@ export const getApiBase = () => API_BASE;
 
 export const api = {
   /**
+   * Get current authenticated user.
+   */
+  async getCurrentUser() {
+    const response = await fetch(`${API_BASE}/api/auth/me`, {
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = new Error('Not authenticated');
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  },
+
+  /**
    * Check database connection status.
    */
   async checkDatabaseStatus() {
