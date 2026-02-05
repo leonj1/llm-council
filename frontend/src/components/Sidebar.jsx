@@ -207,6 +207,13 @@ export default function Sidebar({
             <span className="admin-nav-icon">🧠</span>
             <span className="admin-nav-text">Memory Explorer</span>
           </button>
+          <button
+            className={`admin-nav-item ${location.pathname === '/crawler' ? 'active' : ''}`}
+            onClick={() => navigate('/crawler')}
+          >
+            <span className="admin-nav-icon">🕷️</span>
+            <span className="admin-nav-text">Content Crawler</span>
+          </button>
         </div>
       )}
       {(userRole === 'admin' || userRole === 'superadmin') && collapsed && (
@@ -217,6 +224,13 @@ export default function Sidebar({
             title="Memory Explorer"
           >
             <span className="admin-nav-icon">🧠</span>
+          </button>
+          <button
+            className={`admin-nav-item collapsed ${location.pathname === '/crawler' ? 'active' : ''}`}
+            onClick={() => navigate('/crawler')}
+            title="Content Crawler"
+          >
+            <span className="admin-nav-icon">🕷️</span>
           </button>
         </div>
       )}
