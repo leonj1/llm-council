@@ -60,8 +60,10 @@ export default function MemoryExplorer() {
   const loadAgents = async () => {
     try {
       setIsLoadingAgents(true);
-      const agentList = await api.getMemoryAgents();
-      setAgents(agentList);
+      const response = await api.getMemoryAgents();
+      // API returns { agents: [...] }, extract the array
+      const agentList = response?.agents || response || [];
+      setAgents(Array.isArray(agentList) ? agentList : []);
     } catch (err) {
       console.error('Failed to load agents:', err);
       // Show toast but don't block the UI
@@ -108,7 +110,18 @@ export default function MemoryExplorer() {
         tags: tagList.length > 0 ? tagList : undefined,
       });
 
-      const resultArray = searchResults.results || searchResults || [];
+      // API returns { results: [{ memory: {...}, score, match_type }] }
+      // Flatten to array of memory objects with score attached
+      const rawResults = searchResults?.results || searchResults || [];
+      const resultArray = (Array.isArray(rawResults) ? rawResults : []).map(item => {
+        // Handle both wrapped { memory, score } and flat memory objects
+        const memory = item?.memory || item || {};
+        return {
+          ...memory,
+          score: item?.score ?? memory?.score,
+          match_type: item?.match_type ?? memory?.match_type,
+        };
+      });
       setResults(resultArray);
       
       // Show success toast
@@ -194,11 +207,16 @@ export default function MemoryExplorer() {
                 disabled={isLoadingAgents}
               >
                 <option value="">Select agent...</option>
-                {agents.map((agent) => (
-                  <option key={agent.agent_id || agent} value={agent.agent_id || agent}>
-                    {agent.agent_id || agent}
-                  </option>
-                ))}
+                {agents.map((agent) => {
+                  // Handle both { id, name } and { agent_id } formats, plus plain strings
+                  const agentId = agent?.id || agent?.agent_id || agent;
+                  const agentName = agent?.name || agent?.agent_id || agent;
+                  return (
+                    <option key={agentId} value={agentId}>
+                      {agentName}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           )}
