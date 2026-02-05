@@ -127,6 +127,139 @@
   font-size: 0.9rem;
 }
 
+/* AI Answer Section */
+.ai-answer-section {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--accent-teal);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px var(--shadow-md);
+}
+
+.ai-answer-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.ai-answer-icon {
+  font-size: 1.5rem;
+}
+
+.ai-answer-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.ai-model-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  background: var(--accent-teal);
+  color: white;
+  border-radius: 12px;
+  text-transform: lowercase;
+}
+
+.ai-answer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--text-secondary);
+}
+
+.ai-answer-loading p {
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.ai-answer-error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ai-answer-error p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.retry-btn {
+  padding: 8px 16px;
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.retry-btn:hover {
+  opacity: 0.9;
+}
+
+.ai-answer-content {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.ai-answer-content h1,
+.ai-answer-content h2,
+.ai-answer-content h3 {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.ai-answer-content p {
+  margin-bottom: 0.75em;
+}
+
+.ai-answer-content ul,
+.ai-answer-content ol {
+  margin-bottom: 0.75em;
+  padding-left: 1.5em;
+}
+
+.ai-answer-content code {
+  background: var(--bg-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.ai-answer-content pre {
+  background: var(--bg-tertiary);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 0.75em;
+}
+
+.ai-answer-content blockquote {
+  border-left: 3px solid var(--accent-teal);
+  margin: 0.75em 0;
+  padding-left: 1em;
+  color: var(--text-secondary);
+}
+
 /* Results */
 .memory-results {
   flex: 1;

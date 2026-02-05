@@ -46,6 +46,12 @@ export default function MemoryExplorer() {
   const [results, setResults] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   
+  // AI Synthesis state
+  const [aiAnswer, setAiAnswer] = useState(null);
+  const [aiModel, setAiModel] = useState(null);
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [synthesisError, setSynthesisError] = useState(null);
+  
   // Loading/error state
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingAgents, setIsLoadingAgents] = useState(true);
@@ -89,6 +95,10 @@ export default function MemoryExplorer() {
     setIsLoading(true);
     setError(null);
     setExpandedId(null);
+    // Clear previous AI answer when starting new search
+    setAiAnswer(null);
+    setAiModel(null);
+    setSynthesisError(null);
 
     try {
       // Build scope based on selection
@@ -136,6 +146,9 @@ export default function MemoryExplorer() {
       // Show success toast
       if (resultArray.length > 0) {
         toast.success(`Found ${resultArray.length} memor${resultArray.length === 1 ? 'y' : 'ies'}`);
+        
+        // Automatically synthesize answer if we have results
+        synthesizeAnswer(query.trim(), resultArray);
       } else {
         toast.info('No memories found matching your search');
       }
@@ -148,6 +161,35 @@ export default function MemoryExplorer() {
       // setResults([]); <- removed to preserve existing results
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  /**
+   * Synthesize an AI answer from the memory results using Claude Opus 4.5
+   */
+  const synthesizeAnswer = async (searchQuery, memories) => {
+    if (!memories || memories.length === 0) {
+      return;
+    }
+
+    setIsSynthesizing(true);
+    setSynthesisError(null);
+
+    try {
+      const response = await api.synthesizeMemories({
+        query: searchQuery,
+        memories: memories,
+      });
+
+      setAiAnswer(response.answer);
+      setAiModel(response.model);
+    } catch (err) {
+      console.error('Synthesis failed:', err);
+      const errorMessage = formatErrorMessage(err);
+      setSynthesisError(errorMessage);
+      // Don't show toast for synthesis errors - just show inline error
+    } finally {
+      setIsSynthesizing(false);
     }
   };
 
@@ -261,6 +303,38 @@ export default function MemoryExplorer() {
         </div>
       )}
 
+      {/* AI Synthesis Section */}
+      {(isSynthesizing || aiAnswer || synthesisError) && (
+        <div className="ai-answer-section">
+          <div className="ai-answer-header">
+            <span className="ai-answer-icon">✨</span>
+            <h2>AI Answer</h2>
+            {aiModel && <span className="ai-model-badge">{aiModel.split('/').pop()}</span>}
+          </div>
+          
+          {isSynthesizing ? (
+            <div className="ai-answer-loading">
+              <div className="loading-spinner"></div>
+              <p>Claude is analyzing memories and synthesizing an answer...</p>
+            </div>
+          ) : synthesisError ? (
+            <div className="ai-answer-error">
+              <p>Failed to generate AI answer: {synthesisError}</p>
+              <button 
+                className="retry-btn"
+                onClick={() => synthesizeAnswer(query, results)}
+              >
+                Retry
+              </button>
+            </div>
+          ) : aiAnswer ? (
+            <div className="ai-answer-content">
+              <RenderMarkdown content={aiAnswer} forceMarkdown={true} />
+            </div>
+          ) : null}
+        </div>
+      )}
+
       <div className="memory-results">
         {isLoading ? (
           <div className="memory-loading">
@@ -274,7 +348,11 @@ export default function MemoryExplorer() {
         ) : (
           <>
             <div className="results-header">
-              Found {results.length} memor{results.length === 1 ? 'y' : 'ies'}
+              {aiAnswer ? (
+                <>📚 Sources ({results.length} memor{results.length === 1 ? 'y' : 'ies'})</>
+              ) : (
+                <>Found {results.length} memor{results.length === 1 ? 'y' : 'ies'}</>
+              )}
             </div>
             {results.map((memory) => (
               <div 

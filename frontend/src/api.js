@@ -380,4 +380,27 @@ export const api = {
     }
     return response.json();
   },
+
+  /**
+   * Synthesize an answer from memory search results using Claude Opus 4.5.
+   * Requires admin or superadmin role.
+   * @param {Object} params - Synthesis parameters
+   * @param {string} params.query - The original user query
+   * @param {Object[]} params.memories - Array of memory objects from search results
+   * @returns {Promise<{answer: string, model: string}>}
+   */
+  async synthesizeMemories(params) {
+    const response = await fetch(`${API_BASE}/api/memories/synthesize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(params),
+    });
+    if (!response.ok) {
+      throw await this._extractError(response, 'Failed to synthesize memories');
+    }
+    return response.json();
+  },
 };

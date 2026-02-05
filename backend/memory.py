@@ -1,12 +1,16 @@
 """Memory Explorer API - Proxy to agent-memory-api (admin only)."""
 
 import os
+import logging
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 import httpx
 
 from .auth import require_auth
+from .openrouter import query_model
+
+logger = logging.getLogger("llm-council.memory")
 
 router = APIRouter(prefix="/api/memories", tags=["memories"])
 
@@ -199,3 +203,118 @@ async def get_memory(
                 status_code=502,
                 detail=f"Failed to connect to Agent Memory API: {str(e)}"
             )
+
+
+# Model for AI synthesis - Claude Opus 4.5 via OpenRouter
+SYNTHESIS_MODEL = "anthropic/claude-opus-4.5"
+
+
+class MemorySynthesizeRequest(BaseModel):
+    """Request body for memory synthesis."""
+    query: str
+    memories: List[dict]  # List of memory objects with content, agent_id, etc.
+
+
+class MemorySynthesizeResponse(BaseModel):
+    """Response from memory synthesis."""
+    answer: str
+    model: str
+
+
+@router.post("/synthesize", response_model=MemorySynthesizeResponse)
+async def synthesize_memories(
+    request: MemorySynthesizeRequest,
+    user: dict = Depends(require_admin)
+):
+    """
+    Synthesize an answer from memory search results using Claude Opus 4.5.
+    
+    Takes the user's original query and the memory search results,
+    sends them to Claude Opus 4.5 to generate a coherent answer.
+    
+    Requires admin or superadmin role.
+    """
+    if not request.memories:
+        raise HTTPException(
+            status_code=400,
+            detail="No memories provided for synthesis"
+        )
+    
+    # Build the context from memories
+    memory_context_parts = []
+    for i, memory in enumerate(request.memories, 1):
+        content = memory.get("content", "")
+        agent_id = memory.get("agent_id", "unknown")
+        created_at = memory.get("created_at", "unknown date")
+        project_id = memory.get("project_id", "")
+        tags = memory.get("tags", [])
+        
+        memory_entry = f"**Memory {i}** (Agent: {agent_id}, Date: {created_at})"
+        if project_id:
+            memory_entry += f" [Project: {project_id}]"
+        if tags:
+            memory_entry += f" [Tags: {', '.join(tags)}]"
+        memory_entry += f"\n{content}"
+        memory_context_parts.append(memory_entry)
+    
+    memory_context = "\n\n---\n\n".join(memory_context_parts)
+    
+    # Build the prompt for Claude
+    system_prompt = """You are an AI assistant helping to synthesize information from agent memories.
+Your task is to analyze the provided memories and answer the user's question based on the information contained within them.
+
+Guidelines:
+- Focus on providing a direct, helpful answer to the user's question
+- Cite specific memories when relevant (e.g., "According to Memory 3...")
+- If the memories don't contain enough information to fully answer the question, say so
+- Highlight any contradictions or discrepancies between memories if they exist
+- Be concise but thorough
+- Format your response with clear structure using markdown when appropriate"""
+
+    user_message = f"""**User Question:** {request.query}
+
+**Relevant Memories:**
+
+{memory_context}
+
+Based on these memories, please answer the user's question."""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message}
+    ]
+    
+    logger.info(f"Synthesizing answer for query: {request.query[:100]}... using {len(request.memories)} memories")
+    
+    try:
+        response = await query_model(SYNTHESIS_MODEL, messages, timeout=120.0)
+        
+        if response is None:
+            logger.error("Failed to get response from synthesis model")
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to generate synthesis - model did not respond"
+            )
+        
+        answer = response.get("content", "")
+        if not answer:
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to generate synthesis - empty response"
+            )
+        
+        logger.info(f"Synthesis complete: {len(answer)} characters")
+        
+        return MemorySynthesizeResponse(
+            answer=answer,
+            model=SYNTHESIS_MODEL
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error during memory synthesis: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Synthesis failed: {str(e)}"
+        )
