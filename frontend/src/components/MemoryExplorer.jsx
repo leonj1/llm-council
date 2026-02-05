@@ -237,10 +237,9 @@ export default function MemoryExplorer() {
             onChange={(e) => setQuery(e.target.value)}
           />
           <button 
-            type="button" 
+            type="submit" 
             className="search-btn"
             disabled={isLoading}
-            onClick={handleSearch}
           >
             {isLoading ? 'Searching...' : 'Search'}
           </button>
