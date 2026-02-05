@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useToast } from './Toast';
+import { parseMemoryResponse } from '../utils/parseMemoryResponse';
 import './MemoryExplorer.css';
 
 /**
@@ -110,26 +111,25 @@ export default function MemoryExplorer() {
         tags: tagList.length > 0 ? tagList : undefined,
       });
 
-      // API returns { results: [{ memory: {...}, score, match_type }] }
-      // Flatten to array of memory objects with score attached
-      const rawResults = searchResults?.results || searchResults || [];
-      const resultArray = (Array.isArray(rawResults) ? rawResults : []).map(item => {
-        // Handle both wrapped { memory, score } and flat memory objects
-        const memory = item?.memory || item || {};
-        return {
-          ...memory,
-          // Ensure critical fields have safe defaults
-          id: memory.id || `temp-${Date.now()}-${Math.random()}`,
-          content: memory.content || '',
-          agent_id: memory.agent_id || 'unknown',
-          tags: Array.isArray(memory.tags) ? memory.tags : [],
-          project_id: memory.project_id || null,
-          created_at: memory.created_at || null,
-          // Attach score/match_type from wrapper or memory itself
-          score: item?.score ?? memory?.score,
-          match_type: item?.match_type ?? memory?.match_type,
-        };
-      });
+      // Use the robust parser to handle all edge cases safely
+      const parsed = parseMemoryResponse(searchResults);
+      
+      // Convert ParsedMemory objects to the format expected by the component
+      // (maintaining snake_case for backwards compatibility with template)
+      const resultArray = parsed.results.map(memory => ({
+        id: memory.id,
+        agent_id: memory.agentId,
+        content: memory.content,
+        embedding: memory.embedding,
+        project_id: memory.projectId,
+        tags: memory.tags,
+        tsvector_content: memory.tsvectorContent,
+        created_at: memory.createdAt,
+        updated_at: memory.updatedAt,
+        score: memory.score,
+        match_type: memory.matchType,
+      }));
+      
       setResults(resultArray);
       
       // Show success toast
