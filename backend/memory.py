@@ -208,6 +208,55 @@ async def get_memory(
 # Model for AI synthesis - Claude Opus 4.5 via OpenRouter
 SYNTHESIS_MODEL = "anthropic/claude-opus-4.5"
 
+# Quality filtering thresholds by match type (Option #4: Floor + Cap)
+MIN_SCORES = {
+    "vector": 0.2,    # semantic similarity threshold
+    "keyword": 0.001  # ts_rank threshold
+}
+MAX_MEMORIES_FOR_SYNTHESIS = 5  # cap at top N high-quality results
+
+
+def filter_memories_by_quality(memories: List[dict]) -> tuple[List[dict], dict]:
+    """
+    Filter memories by score threshold based on match type, then cap at max.
+    
+    Args:
+        memories: List of memory dicts with optional 'score' and 'match_type' fields
+        
+    Returns:
+        Tuple of (filtered_memories, stats_dict)
+        stats_dict contains: total_received, passed_threshold, used_for_synthesis, filtered_out
+    """
+    total_received = len(memories)
+    
+    # Filter by match type threshold
+    passed_threshold = []
+    for memory in memories:
+        score = memory.get("score")
+        match_type = memory.get("match_type", "vector")  # default to vector if not specified
+        
+        # If no score, include it (benefit of doubt)
+        if score is None:
+            passed_threshold.append(memory)
+            continue
+        
+        min_score = MIN_SCORES.get(match_type, 0)
+        if score >= min_score:
+            passed_threshold.append(memory)
+    
+    # Sort by score descending (highest quality first) and cap
+    passed_threshold.sort(key=lambda m: m.get("score") or 0, reverse=True)
+    filtered = passed_threshold[:MAX_MEMORIES_FOR_SYNTHESIS]
+    
+    stats = {
+        "total_received": total_received,
+        "passed_threshold": len(passed_threshold),
+        "used_for_synthesis": len(filtered),
+        "filtered_out": total_received - len(filtered)
+    }
+    
+    return filtered, stats
+
 
 class MemorySynthesizeRequest(BaseModel):
     """Request body for memory synthesis."""
@@ -219,6 +268,10 @@ class MemorySynthesizeResponse(BaseModel):
     """Response from memory synthesis."""
     answer: str
     model: str
+    # Quality filtering metadata
+    memories_used: int = 0
+    memories_total: int = 0
+    memories_filtered_out: int = 0
 
 
 @router.post("/synthesize", response_model=MemorySynthesizeResponse)
@@ -232,6 +285,11 @@ async def synthesize_memories(
     Takes the user's original query and the memory search results,
     sends them to Claude Opus 4.5 to generate a coherent answer.
     
+    Quality filtering is applied:
+    - Vector matches require score >= 0.2
+    - Keyword matches require score >= 0.001
+    - Maximum 5 high-quality memories are used
+    
     Requires admin or superadmin role.
     """
     if not request.memories:
@@ -240,9 +298,28 @@ async def synthesize_memories(
             detail="No memories provided for synthesis"
         )
     
-    # Build the context from memories
+    # Apply quality filtering
+    filtered_memories, filter_stats = filter_memories_by_quality(request.memories)
+    
+    logger.info(
+        f"Quality filter: {filter_stats['total_received']} received, "
+        f"{filter_stats['passed_threshold']} passed threshold, "
+        f"{filter_stats['used_for_synthesis']} used for synthesis"
+    )
+    
+    # If no memories pass the quality threshold, return early
+    if not filtered_memories:
+        return MemorySynthesizeResponse(
+            answer="No high-quality memories found for this query. The search returned results, but none met the relevance threshold for synthesis.",
+            model=SYNTHESIS_MODEL,
+            memories_used=0,
+            memories_total=filter_stats["total_received"],
+            memories_filtered_out=filter_stats["filtered_out"]
+        )
+    
+    # Build the context from filtered memories
     memory_context_parts = []
-    for i, memory in enumerate(request.memories, 1):
+    for i, memory in enumerate(filtered_memories, 1):
         content = memory.get("content", "")
         agent_id = memory.get("agent_id", "unknown")
         created_at = memory.get("created_at", "unknown date")
@@ -284,7 +361,7 @@ Based on these memories, please answer the user's question."""
         {"role": "user", "content": user_message}
     ]
     
-    logger.info(f"Synthesizing answer for query: {request.query[:100]}... using {len(request.memories)} memories")
+    logger.info(f"Synthesizing answer for query: {request.query[:100]}... using {len(filtered_memories)} of {filter_stats['total_received']} memories")
     
     try:
         response = await query_model(SYNTHESIS_MODEL, messages, timeout=120.0)
@@ -307,7 +384,10 @@ Based on these memories, please answer the user's question."""
         
         return MemorySynthesizeResponse(
             answer=answer,
-            model=SYNTHESIS_MODEL
+            model=SYNTHESIS_MODEL,
+            memories_used=filter_stats["used_for_synthesis"],
+            memories_total=filter_stats["total_received"],
+            memories_filtered_out=filter_stats["filtered_out"]
         )
         
     except HTTPException:

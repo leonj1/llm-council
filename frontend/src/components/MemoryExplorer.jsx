@@ -49,6 +49,8 @@ export default function MemoryExplorer() {
   // AI Synthesis state
   const [aiAnswer, setAiAnswer] = useState(null);
   const [aiModel, setAiModel] = useState(null);
+  const [memoriesUsed, setMemoriesUsed] = useState(0);
+  const [memoriesTotal, setMemoriesTotal] = useState(0);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [synthesisError, setSynthesisError] = useState(null);
   
@@ -98,6 +100,8 @@ export default function MemoryExplorer() {
     // Clear previous AI answer when starting new search
     setAiAnswer(null);
     setAiModel(null);
+    setMemoriesUsed(0);
+    setMemoriesTotal(0);
     setSynthesisError(null);
 
     try {
@@ -183,6 +187,8 @@ export default function MemoryExplorer() {
 
       setAiAnswer(response.answer);
       setAiModel(response.model);
+      setMemoriesUsed(response.memories_used ?? memories.length);
+      setMemoriesTotal(response.memories_total ?? memories.length);
     } catch (err) {
       console.error('Synthesis failed:', err);
       const errorMessage = formatErrorMessage(err);
@@ -310,6 +316,14 @@ export default function MemoryExplorer() {
             <span className="ai-answer-icon">✨</span>
             <h2>AI Answer</h2>
             {aiModel && <span className="ai-model-badge">{aiModel.split('/').pop()}</span>}
+            {memoriesUsed > 0 && memoriesTotal > 0 && (
+              <span className="ai-memories-badge" title="High-quality memories used for synthesis">
+                {memoriesUsed === memoriesTotal 
+                  ? `${memoriesUsed} memor${memoriesUsed === 1 ? 'y' : 'ies'}`
+                  : `${memoriesUsed} of ${memoriesTotal} (filtered by relevance)`
+                }
+              </span>
+            )}
           </div>
           
           {isSynthesizing ? (

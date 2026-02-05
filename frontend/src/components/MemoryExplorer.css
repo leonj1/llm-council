@@ -168,6 +168,15 @@
   text-transform: lowercase;
 }
 
+.ai-memories-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border-radius: 12px;
+}
+
 .ai-answer-loading {
   display: flex;
   flex-direction: column;
