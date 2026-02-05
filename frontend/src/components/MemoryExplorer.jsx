@@ -118,6 +118,14 @@ export default function MemoryExplorer() {
         const memory = item?.memory || item || {};
         return {
           ...memory,
+          // Ensure critical fields have safe defaults
+          id: memory.id || `temp-${Date.now()}-${Math.random()}`,
+          content: memory.content || '',
+          agent_id: memory.agent_id || 'unknown',
+          tags: Array.isArray(memory.tags) ? memory.tags : [],
+          project_id: memory.project_id || null,
+          created_at: memory.created_at || null,
+          // Attach score/match_type from wrapper or memory itself
           score: item?.score ?? memory?.score,
           match_type: item?.match_type ?? memory?.match_type,
         };
@@ -156,8 +164,11 @@ export default function MemoryExplorer() {
   };
 
   const truncateContent = (content, maxLength = 200) => {
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + '...';
+    // Defensive check for null/undefined content
+    if (!content) return '';
+    const str = String(content);
+    if (str.length <= maxLength) return str;
+    return str.substring(0, maxLength) + '...';
   };
 
   return (
@@ -296,8 +307,8 @@ export default function MemoryExplorer() {
 
                 <div className="memory-content">
                   {expandedId === memory.id 
-                    ? memory.content 
-                    : truncateContent(memory.content)
+                    ? (memory.content || '') 
+                    : truncateContent(memory.content || '')
                   }
                 </div>
 
