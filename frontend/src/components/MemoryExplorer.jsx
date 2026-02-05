@@ -235,6 +235,12 @@ export default function MemoryExplorer() {
             placeholder="Search memories..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isLoading) {
+                e.preventDefault();
+                handleSearch(e);
+              }
+            }}
           />
           <button 
             type="submit" 
