@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useToast } from './Toast';
 import { parseMemoryResponse } from '../utils/parseMemoryResponse';
+import RenderMarkdown from './RenderMarkdown';
 import './MemoryExplorer.css';
 
 /**
@@ -306,10 +307,11 @@ export default function MemoryExplorer() {
                 </div>
 
                 <div className="memory-content">
-                  {expandedId === memory.id 
-                    ? (memory.content || '') 
-                    : truncateContent(memory.content || '')
-                  }
+                  {expandedId === memory.id ? (
+                    <RenderMarkdown content={memory.content || ''} />
+                  ) : (
+                    truncateContent(memory.content || '')
+                  )}
                 </div>
 
                 {memory.tags && memory.tags.length > 0 && (

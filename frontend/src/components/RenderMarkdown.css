@@ -1,0 +1,172 @@
+/* RenderMarkdown Styles */
+
+.render-markdown,
+.render-plaintext {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.render-plaintext {
+  white-space: pre-wrap;
+}
+
+/* Markdown-specific styling */
+.render-markdown h1,
+.render-markdown h2,
+.render-markdown h3,
+.render-markdown h4,
+.render-markdown h5,
+.render-markdown h6 {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.render-markdown h1:first-child,
+.render-markdown h2:first-child,
+.render-markdown h3:first-child {
+  margin-top: 0;
+}
+
+.render-markdown h1 { font-size: 1.4em; }
+.render-markdown h2 { font-size: 1.25em; }
+.render-markdown h3 { font-size: 1.1em; }
+.render-markdown h4 { font-size: 1em; }
+.render-markdown h5 { font-size: 0.9em; }
+.render-markdown h6 { font-size: 0.85em; }
+
+.render-markdown p {
+  margin: 0.75em 0;
+}
+
+.render-markdown p:first-child {
+  margin-top: 0;
+}
+
+.render-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.render-markdown strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.render-markdown em {
+  font-style: italic;
+}
+
+.render-markdown a {
+  color: var(--accent-teal);
+  text-decoration: none;
+}
+
+.render-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* Code styling */
+.render-markdown code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+  background: var(--bg-tertiary);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  color: var(--accent-purple);
+}
+
+.render-markdown pre {
+  margin: 0.75em 0;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.render-markdown pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.85em;
+  color: var(--text-primary);
+}
+
+/* Lists */
+.render-markdown ul,
+.render-markdown ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.render-markdown li {
+  margin: 0.25em 0;
+}
+
+.render-markdown li > ul,
+.render-markdown li > ol {
+  margin: 0.25em 0;
+}
+
+/* Blockquotes */
+.render-markdown blockquote {
+  margin: 0.75em 0;
+  padding: 0.5em 1em;
+  border-left: 3px solid var(--accent-teal);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.render-markdown blockquote p {
+  margin: 0;
+}
+
+/* Horizontal rules */
+.render-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border-secondary);
+  margin: 1em 0;
+}
+
+/* Tables (GFM) */
+.render-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75em 0;
+  font-size: 0.9em;
+}
+
+.render-markdown th,
+.render-markdown td {
+  padding: 8px 12px;
+  border: 1px solid var(--border-secondary);
+  text-align: left;
+}
+
+.render-markdown th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.render-markdown tr:nth-child(even) {
+  background: var(--bg-hover);
+}
+
+/* Images */
+.render-markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.5em 0;
+}
+
+/* Task lists (GFM) */
+.render-markdown input[type="checkbox"] {
+  margin-right: 0.5em;
+}
+
+/* Strikethrough (GFM) */
+.render-markdown del {
+  color: var(--text-muted);
+}
