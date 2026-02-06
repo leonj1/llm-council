@@ -37,7 +37,18 @@ function isYouTubeUrl(url) {
   }
 }
 
-const EXTRACTOR_BASE = 'https://crawl-youtube-extractor-production.up.railway.app';
+// Check if URL is valid
+function isValidUrl(url) {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const YOUTUBE_EXTRACTOR_BASE = 'https://crawl-youtube-extractor-production.up.railway.app';
+const URL_EXTRACTOR_BASE = 'https://crawl-url-extractor-production.up.railway.app';
 
 export default function CrawlerPage() {
   const navigate = useNavigate();
@@ -54,6 +65,7 @@ export default function CrawlerPage() {
   
   const eventSourceRef = useRef(null);
   const progressContainerRef = useRef(null);
+  const pollingIntervalRef = useRef(null);
 
   useEffect(() => {
     checkAuth();
@@ -61,6 +73,10 @@ export default function CrawlerPage() {
       // Cleanup SSE on unmount
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
+      }
+      // Cleanup polling on unmount
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
       }
     };
   }, []);
@@ -82,7 +98,7 @@ export default function CrawlerPage() {
       } else {
         setUser(userData);
       }
-    } catch (err) {
+    } catch {
       navigate('/');
     } finally {
       setLoading(false);
@@ -102,83 +118,26 @@ export default function CrawlerPage() {
       setExtractionError('Please enter a URL');
       return;
     }
-    
-    // Check if YouTube
-    if (!isYouTubeUrl(url)) {
-      setExtractionError('Only YouTube URLs are currently supported');
+
+    // Check if valid URL
+    if (!isValidUrl(url)) {
+      setExtractionError('Please enter a valid URL');
       return;
     }
-    
+
     // Start extraction
     setExtracting(true);
     const targetUlid = generateULID();
-    const version = 1;
-    
+    const isYouTube = isYouTubeUrl(url);
+
     try {
-      // Start SSE connection for progress FIRST
-      const progressUrl = `${EXTRACTOR_BASE}/extract/${targetUlid}/${version}/progress`;
-      const eventSource = new EventSource(progressUrl);
-      eventSourceRef.current = eventSource;
-      
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          setProgress(prev => [...prev, data]);
-          
-          // Check for completion
-          if (data.status === 'complete' || data.status === 'completed') {
-            setResult(data);
-            eventSource.close();
-            setExtracting(false);
-          } else if (data.status === 'error' || data.status === 'failed') {
-            setExtractionError(data.message || data.error || 'Extraction failed');
-            eventSource.close();
-            setExtracting(false);
-          }
-        } catch (parseErr) {
-          console.error('Failed to parse SSE event:', parseErr);
-        }
-      };
-      
-      eventSource.onerror = (err) => {
-        console.error('SSE error:', err);
-        // Don't set error immediately - could just be connection closing normally
-        if (eventSource.readyState === EventSource.CLOSED) {
-          if (!result) {
-            // Only set error if we haven't received a result
-            setExtractionError('Connection to progress stream lost');
-          }
-          setExtracting(false);
-        }
-      };
-      
-      // Now trigger the extraction
-      const response = await fetch(`${EXTRACTOR_BASE}/extract`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          youtube_url: url,
-          target_ulid: targetUlid,
-          version: version,
-          bucket: 'crawler-extractions',
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}`);
+      if (isYouTube) {
+        // YouTube extraction with SSE
+        await handleYouTubeExtraction(targetUlid);
+      } else {
+        // Regular URL extraction with polling
+        await handleUrlExtraction(targetUlid);
       }
-      
-      // Response might contain immediate result or just acknowledgment
-      const data = await response.json();
-      if (data.status === 'complete' || data.status === 'completed') {
-        setResult(data);
-        eventSource.close();
-        setExtracting(false);
-      }
-      
     } catch (err) {
       console.error('Extraction error:', err);
       setExtractionError(err.message || 'Failed to start extraction');
@@ -186,7 +145,164 @@ export default function CrawlerPage() {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
     }
+  };
+
+  const handleYouTubeExtraction = async (targetUlid) => {
+    const version = 1;
+
+    // Start SSE connection for progress FIRST
+    const progressUrl = `${YOUTUBE_EXTRACTOR_BASE}/extract/${targetUlid}/${version}/progress`;
+    const eventSource = new EventSource(progressUrl);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setProgress(prev => [...prev, data]);
+
+        // Check for completion
+        if (data.status === 'complete' || data.status === 'completed') {
+          setResult(data);
+          eventSource.close();
+          setExtracting(false);
+        } else if (data.status === 'error' || data.status === 'failed') {
+          setExtractionError(data.message || data.error || 'Extraction failed');
+          eventSource.close();
+          setExtracting(false);
+        }
+      } catch (parseErr) {
+        console.error('Failed to parse SSE event:', parseErr);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error('SSE error:', err);
+      // Don't set error immediately - could just be connection closing normally
+      if (eventSource.readyState === EventSource.CLOSED) {
+        // Check if we already have a result before setting error
+        setExtracting(currentExtracting => {
+          if (currentExtracting) {
+            setExtractionError('Connection to progress stream lost');
+          }
+          return false;
+        });
+      }
+    };
+
+    // Now trigger the extraction
+    const response = await fetch(`${YOUTUBE_EXTRACTOR_BASE}/extract`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        youtube_url: url,
+        target_ulid: targetUlid,
+        version: version,
+        bucket: 'crawler-extractions',
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}`);
+    }
+
+    // Response might contain immediate result or just acknowledgment
+    const data = await response.json();
+    if (data.status === 'complete' || data.status === 'completed') {
+      setResult(data);
+      eventSource.close();
+      setExtracting(false);
+    }
+  };
+
+  const handleUrlExtraction = async (targetUlid) => {
+    // Add initial progress message
+    setProgress([{ status: 'started', message: 'Submitting URL for extraction...' }]);
+
+    // Submit URL for extraction
+    const response = await fetch(`${URL_EXTRACTOR_BASE}/extract`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: url,
+        target_ulid: targetUlid,
+        bucket: 'crawler-extractions',
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}`);
+    }
+
+    const submitData = await response.json();
+    setProgress(prev => [...prev, { status: 'processing', message: 'Extraction submitted, polling for status...' }]);
+
+    // Check if already complete
+    if (submitData.status === 'complete' || submitData.status === 'completed') {
+      setResult(submitData);
+      setExtracting(false);
+      return;
+    }
+
+    // Start polling for status
+    let pollCount = 0;
+    const maxPolls = 120; // 2 minutes at 1 second intervals
+
+    pollingIntervalRef.current = setInterval(async () => {
+      pollCount++;
+
+      if (pollCount > maxPolls) {
+        clearInterval(pollingIntervalRef.current);
+        setExtractionError('Extraction timed out');
+        setExtracting(false);
+        return;
+      }
+
+      try {
+        const statusResponse = await fetch(`${URL_EXTRACTOR_BASE}/status/${targetUlid}`);
+
+        if (!statusResponse.ok) {
+          // 404 means still processing
+          if (statusResponse.status === 404) {
+            return;
+          }
+          const errorData = await statusResponse.json().catch(() => ({}));
+          throw new Error(errorData.detail || errorData.message || `HTTP ${statusResponse.status}`);
+        }
+
+        const statusData = await statusResponse.json();
+
+        // Update progress
+        if (statusData.status && statusData.status !== progress[progress.length - 1]?.status) {
+          setProgress(prev => [...prev, statusData]);
+        }
+
+        // Check for completion
+        if (statusData.status === 'complete' || statusData.status === 'completed') {
+          clearInterval(pollingIntervalRef.current);
+          setResult(statusData);
+          setExtracting(false);
+        } else if (statusData.status === 'error' || statusData.status === 'failed') {
+          clearInterval(pollingIntervalRef.current);
+          setExtractionError(statusData.message || statusData.error || 'Extraction failed');
+          setExtracting(false);
+        }
+      } catch (pollErr) {
+        console.error('Polling error:', pollErr);
+        clearInterval(pollingIntervalRef.current);
+        setExtractionError(pollErr.message || 'Failed to check extraction status');
+        setExtracting(false);
+      }
+    }, 1000);
   };
 
   const getStatusIcon = (status) => {
@@ -195,6 +311,9 @@ export default function CrawlerPage() {
       case 'processing':
       case 'downloading':
       case 'transcribing':
+      case 'extracting':
+      case 'crawling':
+      case 'pending':
         return '⏳';
       case 'complete':
       case 'completed':
@@ -246,7 +365,7 @@ export default function CrawlerPage() {
       <div className="crawler-content">
         <div className="crawler-header">
           <h1>🕷️ Content Crawler</h1>
-          <p>Extract transcripts and metadata from YouTube videos</p>
+          <p>Extract content from YouTube videos and web pages</p>
         </div>
         
         <form className="crawler-form" onSubmit={handleSubmit}>
@@ -255,7 +374,7 @@ export default function CrawlerPage() {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste a YouTube URL..."
+              placeholder="Paste a YouTube or web page URL..."
               className="url-input"
               disabled={extracting}
             />
@@ -337,7 +456,7 @@ export default function CrawlerPage() {
                 </div>
               )}
               <p className="result-note">
-                📝 Transcript saved to S3 and indexed in agent memory for future retrieval.
+                📝 Content saved to S3 and indexed in agent memory for future retrieval.
               </p>
             </div>
           </div>
