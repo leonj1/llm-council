@@ -521,3 +521,159 @@ def delete_chat(chat_id: str) -> bool:
         else:
             logger.warning(f"DB DELETE chats: No chat found with id={chat_id}, rows_affected=0")
         return success
+
+
+# ===== Session Management (for persistent authentication) =====
+
+def create_session(
+    session_id: str,
+    user_id: int,
+    email: str,
+    name: Optional[str],
+    picture_url: Optional[str],
+    role: str,
+    expires_days: int = 7
+) -> Optional[dict]:
+    """
+    Create a new session in the database.
+
+    Args:
+        session_id: Unique session token (from secrets.token_urlsafe)
+        user_id: ID of the authenticated user
+        email: User's email
+        name: User's display name
+        picture_url: User's profile picture URL
+        role: User's role (user, admin, etc.)
+        expires_days: Number of days until session expires (default 7)
+
+    Returns the created session record if successful, None otherwise.
+    """
+    logger.info(f"DB CREATE_SESSION: Creating session for user_id={user_id}, email={email}")
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            logger.warning("DB CREATE_SESSION: Database not available, skipping session creation")
+            return None
+
+        cursor.execute(
+            """
+            INSERT INTO sessions (id, user_id, email, name, picture_url, role, expires_at)
+            VALUES (%s, %s, %s, %s, %s, %s, DATE_ADD(NOW(), INTERVAL %s DAY))
+            """,
+            (session_id, user_id, email, name, picture_url, role, expires_days)
+        )
+        logger.info(f"DB INSERT sessions: Successfully created session for user_id={user_id}")
+
+        # Return session data in the same format as the old in-memory sessions
+        return {
+            "email": email,
+            "name": name,
+            "picture": picture_url,
+            "user_id": user_id,
+            "role": role,
+        }
+
+
+def get_session(session_id: str) -> Optional[dict]:
+    """
+    Get a session by ID if it exists and hasn't expired.
+
+    Args:
+        session_id: The session token
+
+    Returns the session data if valid, None if not found or expired.
+    """
+    logger.debug(f"DB SELECT sessions: Looking up session")
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            return None
+
+        cursor.execute(
+            """
+            SELECT id, user_id, email, name, picture_url, role, created_at, expires_at
+            FROM sessions
+            WHERE id = %s AND expires_at > NOW()
+            """,
+            (session_id,)
+        )
+        session = cursor.fetchone()
+
+        if session:
+            logger.debug(f"DB SELECT sessions: Found valid session for user_id={session['user_id']}")
+            # Return in the same format as the old in-memory sessions
+            return {
+                "email": session["email"],
+                "name": session["name"],
+                "picture": session["picture_url"],
+                "user_id": session["user_id"],
+                "role": session["role"],
+            }
+        else:
+            logger.debug("DB SELECT sessions: Session not found or expired")
+            return None
+
+
+def delete_session(session_id: str) -> bool:
+    """
+    Delete a session by ID.
+
+    Args:
+        session_id: The session token to delete
+
+    Returns True if session was deleted, False otherwise.
+    """
+    logger.info(f"DB DELETE_SESSION: Deleting session")
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            logger.warning("DB DELETE_SESSION: Database not available")
+            return False
+
+        cursor.execute(
+            "DELETE FROM sessions WHERE id = %s",
+            (session_id,)
+        )
+
+        success = cursor.rowcount > 0
+        if success:
+            logger.info(f"DB DELETE sessions: Successfully deleted session")
+        else:
+            logger.debug("DB DELETE sessions: Session not found")
+        return success
+
+
+def update_session_role(session_id: str, role: str) -> bool:
+    """
+    Update the role in a session (used when refreshing from database).
+
+    Args:
+        session_id: The session token
+        role: New role value
+
+    Returns True if updated, False otherwise.
+    """
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            return False
+
+        cursor.execute(
+            "UPDATE sessions SET role = %s WHERE id = %s",
+            (role, session_id)
+        )
+        return cursor.rowcount > 0
+
+
+def cleanup_expired_sessions() -> int:
+    """
+    Delete all expired sessions from the database.
+    Should be called periodically (e.g., via cron or on startup).
+
+    Returns the number of sessions deleted.
+    """
+    logger.info("DB CLEANUP_SESSIONS: Removing expired sessions")
+    with get_db_cursor() as cursor:
+        if cursor is None:
+            return 0
+
+        cursor.execute("DELETE FROM sessions WHERE expires_at <= NOW()")
+        deleted = cursor.rowcount
+        logger.info(f"DB DELETE sessions: Cleaned up {deleted} expired sessions")
+        return deleted

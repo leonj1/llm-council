@@ -7,7 +7,15 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 import httpx
 
-from .database import upsert_user, get_user_by_id
+from .database import (
+    upsert_user,
+    get_user_by_id,
+    create_session,
+    get_session,
+    delete_session,
+    update_session_role,
+    cleanup_expired_sessions,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -17,8 +25,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8004/api/auth/google/callback")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
-# In-memory session store (use Redis/DB in production)
-sessions: dict[str, dict] = {}
+# OAuth state store (short-lived, in-memory is fine for CSRF protection)
 oauth_states: dict[str, bool] = {}
 
 
@@ -108,17 +115,22 @@ async def google_callback(code: str = None, state: str = None, error: str = None
 
     print(f"User persisted to database: {email} (id={db_user['id']})")
 
-    # Create session with guaranteed user_id and role
+    # Create persistent session in database
     session_id = secrets.token_urlsafe(32)
-    sessions[session_id] = {
-        "email": email,
-        "name": name,
-        "picture": picture,
-        "user_id": db_user["id"],
-        "role": db_user.get("role", "user"),
-    }
+    session = create_session(
+        session_id=session_id,
+        user_id=db_user["id"],
+        email=email,
+        name=name,
+        picture_url=picture,
+        role=db_user.get("role", "user"),
+        expires_days=7,
+    )
 
-    # Redirect to frontend with session
+    if session is None:
+        return RedirectResponse(url=f"{FRONTEND_URL}?error=session_creation_failed")
+
+    # Redirect to frontend with session cookie
     response = RedirectResponse(url=f"{FRONTEND_URL}/chat")
     response.set_cookie(
         key="session_id",
@@ -138,17 +150,23 @@ async def get_current_user(request: Request):
     are immediately reflected without requiring re-login.
     """
     session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in sessions:
+    if not session_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    session = sessions[session_id]
+    # Get session from database (returns None if not found or expired)
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     
     # Refresh role from database to pick up any role changes
     if "user_id" in session:
         db_user = get_user_by_id(session["user_id"])
         if db_user:
-            # Update session with current role from database
-            session["role"] = db_user.get("role", "user")
+            new_role = db_user.get("role", "user")
+            if new_role != session.get("role"):
+                # Update session in database with new role
+                update_session_role(session_id, new_role)
+                session["role"] = new_role
     
     return session
 
@@ -157,8 +175,8 @@ async def get_current_user(request: Request):
 async def logout(request: Request):
     """Logout and clear session."""
     session_id = request.cookies.get("session_id")
-    if session_id and session_id in sessions:
-        del sessions[session_id]
+    if session_id:
+        delete_session(session_id)
 
     response = RedirectResponse(url=FRONTEND_URL)
     response.delete_cookie("session_id")
@@ -169,8 +187,8 @@ async def require_auth(request: Request) -> dict:
     """
     FastAPI dependency to require authentication.
 
-    Extracts session_id from cookie and returns the user dict from session store.
-    Raises 401 HTTPException if session is missing or invalid.
+    Extracts session_id from cookie and returns the user dict from database.
+    Raises 401 HTTPException if session is missing, invalid, or expired.
 
     Returns:
         dict: User session data containing email, name, picture, and user_id
@@ -179,7 +197,11 @@ async def require_auth(request: Request) -> dict:
         HTTPException: 401 if not authenticated
     """
     session_id = request.cookies.get("session_id")
-    if not session_id or session_id not in sessions:
+    if not session_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    return sessions[session_id]
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    return session

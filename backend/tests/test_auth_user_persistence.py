@@ -4,7 +4,7 @@ Integration tests for authentication and user persistence flow.
 Tests that:
 1. OAuth callback fails if database user creation fails
 2. User is persisted to database on successful OAuth
-3. Session contains valid user_id after successful OAuth
+3. Session contains valid user_id after successful OAuth (now stored in database)
 4. Chat creation requires valid user_id from database
 """
 
@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from fastapi.responses import RedirectResponse
 
 from backend.main import app
-from backend.auth import require_auth, sessions
+from backend.auth import require_auth
 from backend import database
 
 
@@ -74,12 +74,14 @@ class TestOAuthCallbackFailsWithoutDatabase:
 class TestOAuthCallbackSucceedsWithDatabase:
     """
     Test that OAuth callback succeeds and creates session with valid user_id.
+    Sessions are now persisted to database instead of in-memory.
     """
 
+    @patch('backend.auth.create_session')
     @patch('backend.auth.upsert_user')
     @patch('backend.auth.httpx.AsyncClient')
     def test_oauth_callback_creates_session_with_user_id(
-        self, mock_async_client, mock_upsert_user
+        self, mock_async_client, mock_upsert_user, mock_create_session
     ):
         """OAuth callback should create session with user_id from database."""
         # Arrange
@@ -90,6 +92,15 @@ class TestOAuthCallbackSucceedsWithDatabase:
             "email": "test@example.com",
             "name": "Test User",
             "picture_url": "https://example.com/pic.jpg"
+        }
+
+        # Mock create_session to return session data
+        mock_create_session.return_value = {
+            "email": "test@example.com",
+            "name": "Test User",
+            "picture": "https://example.com/pic.jpg",
+            "user_id": expected_user_id,
+            "role": "user",
         }
 
         # Mock the httpx client for Google OAuth
@@ -119,9 +130,6 @@ class TestOAuthCallbackSucceedsWithDatabase:
         from backend.auth import oauth_states
         oauth_states["valid_state_2"] = True
 
-        # Clear existing sessions
-        sessions.clear()
-
         client = TestClient(app, follow_redirects=False)
 
         # Act
@@ -133,11 +141,11 @@ class TestOAuthCallbackSucceedsWithDatabase:
         assert "/chat" in location, f"Expected redirect to /chat, got: {location}"
         assert "error" not in location, f"Should not have error in redirect: {location}"
 
-        # Verify session was created with user_id
-        assert len(sessions) == 1, "Expected exactly one session"
-        session_data = list(sessions.values())[0]
-        assert session_data["user_id"] == expected_user_id, f"Expected user_id={expected_user_id}, got {session_data['user_id']}"
-        assert session_data["email"] == "test@example.com"
+        # Verify create_session was called with correct parameters
+        mock_create_session.assert_called_once()
+        call_kwargs = mock_create_session.call_args[1]
+        assert call_kwargs["user_id"] == expected_user_id, f"Expected user_id={expected_user_id}"
+        assert call_kwargs["email"] == "test@example.com"
 
 
 class TestChatCreationRequiresValidUser:
