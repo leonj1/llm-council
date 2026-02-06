@@ -47,8 +47,9 @@ function isValidUrl(url) {
   }
 }
 
-const YOUTUBE_EXTRACTOR_BASE = 'https://crawl-youtube-extractor-production.up.railway.app';
-const URL_EXTRACTOR_BASE = 'https://crawl-url-extractor-production.up.railway.app';
+// Extractor service URLs - configurable via environment variables with production defaults
+const YOUTUBE_EXTRACTOR_BASE = import.meta.env.VITE_YOUTUBE_EXTRACTOR_BASE || 'https://crawl-youtube-extractor-production.up.railway.app';
+const URL_EXTRACTOR_BASE = import.meta.env.VITE_URL_EXTRACTOR_BASE || 'https://crawl-url-extractor-production.up.railway.app';
 
 export default function CrawlerPage() {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export default function CrawlerPage() {
   
   const eventSourceRef = useRef(null);
   const progressContainerRef = useRef(null);
-  const pollingIntervalRef = useRef(null);
+  const pollingTimeoutRef = useRef(null);
 
   useEffect(() => {
     checkAuth();
@@ -75,8 +76,8 @@ export default function CrawlerPage() {
         eventSourceRef.current.close();
       }
       // Cleanup polling on unmount
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
       }
     };
   }, []);
@@ -145,13 +146,15 @@ export default function CrawlerPage() {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
       }
     }
   };
 
   const handleYouTubeExtraction = async (targetUlid) => {
+    // Note: Extractor endpoints are intentionally public (no auth required).
+    // They use ULID-based tracking for job isolation instead of user authentication.
     const version = 1;
 
     // Start SSE connection for progress FIRST
@@ -222,6 +225,9 @@ export default function CrawlerPage() {
   };
 
   const handleUrlExtraction = async (targetUlid) => {
+    // Note: Extractor endpoints are intentionally public (no auth required).
+    // They use ULID-based tracking for job isolation instead of user authentication.
+
     // Add initial progress message
     setProgress([{ status: 'started', message: 'Submitting URL for extraction...' }]);
 
@@ -253,15 +259,11 @@ export default function CrawlerPage() {
       return;
     }
 
-    // Start polling for status
-    let pollCount = 0;
+    // Start polling for status using recursive setTimeout to prevent overlapping requests
     const maxPolls = 120; // 2 minutes at 1 second intervals
 
-    pollingIntervalRef.current = setInterval(async () => {
-      pollCount++;
-
+    const pollStatus = async (pollCount) => {
       if (pollCount > maxPolls) {
-        clearInterval(pollingIntervalRef.current);
         setExtractionError('Extraction timed out');
         setExtracting(false);
         return;
@@ -271,8 +273,9 @@ export default function CrawlerPage() {
         const statusResponse = await fetch(`${URL_EXTRACTOR_BASE}/status/${targetUlid}`);
 
         if (!statusResponse.ok) {
-          // 404 means still processing
+          // 404 means still processing, schedule next poll
           if (statusResponse.status === 404) {
+            pollingTimeoutRef.current = setTimeout(() => pollStatus(pollCount + 1), 1000);
             return;
           }
           const errorData = await statusResponse.json().catch(() => ({}));
@@ -281,28 +284,35 @@ export default function CrawlerPage() {
 
         const statusData = await statusResponse.json();
 
-        // Update progress
-        if (statusData.status && statusData.status !== progress[progress.length - 1]?.status) {
-          setProgress(prev => [...prev, statusData]);
-        }
+        // Update progress using functional updater to avoid stale closure
+        setProgress(prev => {
+          const lastStatus = prev[prev.length - 1]?.status;
+          if (statusData.status && statusData.status !== lastStatus) {
+            return [...prev, statusData];
+          }
+          return prev;
+        });
 
         // Check for completion
         if (statusData.status === 'complete' || statusData.status === 'completed') {
-          clearInterval(pollingIntervalRef.current);
           setResult(statusData);
           setExtracting(false);
         } else if (statusData.status === 'error' || statusData.status === 'failed') {
-          clearInterval(pollingIntervalRef.current);
           setExtractionError(statusData.message || statusData.error || 'Extraction failed');
           setExtracting(false);
+        } else {
+          // Still processing, schedule next poll
+          pollingTimeoutRef.current = setTimeout(() => pollStatus(pollCount + 1), 1000);
         }
       } catch (pollErr) {
         console.error('Polling error:', pollErr);
-        clearInterval(pollingIntervalRef.current);
         setExtractionError(pollErr.message || 'Failed to check extraction status');
         setExtracting(false);
       }
-    }, 1000);
+    };
+
+    // Start first poll
+    pollingTimeoutRef.current = setTimeout(() => pollStatus(1), 1000);
   };
 
   const getStatusIcon = (status) => {
