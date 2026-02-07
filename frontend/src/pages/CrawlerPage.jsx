@@ -59,6 +59,7 @@ export default function CrawlerPage() {
   
   // Extraction state
   const [url, setUrl] = useState('');
+  const [depth, setDepth] = useState(2);
   const [extracting, setExtracting] = useState(false);
   const [progress, setProgress] = useState([]);
   const [result, setResult] = useState(null);
@@ -241,6 +242,7 @@ export default function CrawlerPage() {
         url: url,
         target_ulid: targetUlid,
         bucket: 'crawler-extractions',
+        depth: depth,
       }),
     });
 
@@ -397,6 +399,24 @@ export default function CrawlerPage() {
             </button>
           </div>
           
+          {/* Depth selector - only show for non-YouTube URLs */}
+          {url.trim() && isValidUrl(url) && !isYouTubeUrl(url) && (
+            <div className="depth-selector">
+              <label htmlFor="depth-select">Crawl Depth:</label>
+              <select
+                id="depth-select"
+                value={depth}
+                onChange={(e) => setDepth(Number(e.target.value))}
+                disabled={extracting}
+                className="depth-select"
+              >
+                {[1, 2, 3, 4, 5].map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {extractionError && (
             <div className="extraction-error">
               <span className="error-icon">⚠️</span>

@@ -197,6 +197,41 @@
   cursor: not-allowed;
 }
 
+/* Depth Selector */
+.depth-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.depth-selector label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.depth-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.depth-select:focus {
+  outline: none;
+  border-color: var(--accent-teal);
+}
+
+.depth-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Error */
 .extraction-error {
   display: flex;
