@@ -257,76 +257,16 @@ export default function CrawlerPage() {
       throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}`);
     }
 
-    const submitData = await response.json();
-    setProgress(prev => [...prev, { status: 'processing', message: 'Extraction submitted, polling for status...' }]);
-
-    // Check if already complete
-    if (submitData.status === 'complete' || submitData.status === 'completed') {
-      setResult(submitData);
-      setExtracting(false);
-      return;
-    }
-
-    // Start polling for status using recursive setTimeout to prevent overlapping requests
-    const maxPolls = 120; // 2 minutes at 1 second intervals
-
-    const pollStatus = async (pollCount) => {
-      if (pollCount > maxPolls) {
-        setExtractionError('Extraction timed out');
-        setExtracting(false);
-        return;
-      }
-
-      try {
-        const statusResponse = await fetch(`${URL_EXTRACTOR_BASE}/status/${targetUlid}`);
-
-        if (!statusResponse.ok) {
-          // 404 means still processing, schedule next poll
-          if (statusResponse.status === 404) {
-            pollingTimeoutRef.current = setTimeout(() => pollStatus(pollCount + 1), 1000);
-            return;
-          }
-          const errorData = await statusResponse.json().catch(() => ({}));
-          throw new Error(errorData.detail || errorData.message || `HTTP ${statusResponse.status}`);
-        }
-
-        const statusData = await statusResponse.json();
-
-        // Update progress using functional updater to avoid stale closure
-        setProgress(prev => {
-          const lastStatus = prev[prev.length - 1]?.status;
-          if (statusData.status && statusData.status !== lastStatus) {
-            return [...prev, statusData];
-          }
-          return prev;
-        });
-
-        // Check for completion
-        if (statusData.status === 'complete' || statusData.status === 'completed') {
-          setResult(statusData);
-          setExtracting(false);
-        } else if (statusData.status === 'error' || statusData.status === 'failed') {
-          setExtractionError(statusData.message || statusData.error || 'Extraction failed');
-          setExtracting(false);
-        } else {
-          // Still processing, schedule next poll
-          pollingTimeoutRef.current = setTimeout(() => pollStatus(pollCount + 1), 1000);
-        }
-      } catch (pollErr) {
-        console.error('Polling error:', pollErr);
-        setExtractionError(pollErr.message || 'Failed to check extraction status');
-        setExtracting(false);
-      }
-    };
-
-    // Start first poll
-    pollingTimeoutRef.current = setTimeout(() => pollStatus(1), 1000);
+    await response.json();
+    setProgress(prev => [...prev, { status: 'submitted', message: 'Extraction submitted.' }]);
+    setExtracting(false);
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
       case 'started':
       case 'processing':
+      case 'submitted':
       case 'downloading':
       case 'transcribing':
       case 'extracting':
