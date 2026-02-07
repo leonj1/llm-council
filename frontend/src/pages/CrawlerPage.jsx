@@ -50,6 +50,12 @@ function isValidUrl(url) {
 // Extractor service URLs - configurable via environment variables with production defaults
 const YOUTUBE_EXTRACTOR_BASE = import.meta.env.VITE_YOUTUBE_EXTRACTOR_BASE || 'https://crawl-youtube-extractor-production.up.railway.app';
 const URL_EXTRACTOR_BASE = import.meta.env.VITE_URL_EXTRACTOR_BASE || 'https://crawl-url-extractor-production.up.railway.app';
+const ALLOWED_CRAWL_DEPTHS = [1, 2, 3, 4];
+const DEFAULT_CRAWL_DEPTH = 2;
+
+function normalizeCrawlDepth(depth) {
+  return ALLOWED_CRAWL_DEPTHS.includes(depth) ? depth : DEFAULT_CRAWL_DEPTH;
+}
 
 export default function CrawlerPage() {
   const navigate = useNavigate();
@@ -59,7 +65,7 @@ export default function CrawlerPage() {
   
   // Extraction state
   const [url, setUrl] = useState('');
-  const [depth, setDepth] = useState(2);
+  const [depth, setDepth] = useState(DEFAULT_CRAWL_DEPTH);
   const [extracting, setExtracting] = useState(false);
   const [progress, setProgress] = useState([]);
   const [result, setResult] = useState(null);
@@ -242,7 +248,7 @@ export default function CrawlerPage() {
         url: url,
         target_ulid: targetUlid,
         version: 1,
-        depth: depth,
+        depth: normalizeCrawlDepth(depth),
       }),
     });
 
@@ -406,11 +412,11 @@ export default function CrawlerPage() {
               <select
                 id="depth-select"
                 value={depth}
-                onChange={(e) => setDepth(Number(e.target.value))}
+                onChange={(e) => setDepth(normalizeCrawlDepth(Number(e.target.value)))}
                 disabled={extracting}
                 className="depth-select"
               >
-                {[1, 2, 3, 4, 5].map((d) => (
+                {ALLOWED_CRAWL_DEPTHS.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
