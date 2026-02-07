@@ -241,7 +241,7 @@ export default function CrawlerPage() {
       body: JSON.stringify({
         url: url,
         target_ulid: targetUlid,
-        bucket: 'crawler-extractions',
+        version: 1,
         depth: depth,
       }),
     });
