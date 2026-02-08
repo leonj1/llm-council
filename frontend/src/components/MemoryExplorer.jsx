@@ -45,6 +45,7 @@ export default function MemoryExplorer() {
   const [agents, setAgents] = useState([]);
   const [results, setResults] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
+  const [isSourcesExpanded, setIsSourcesExpanded] = useState(false);
   
   // AI Synthesis state
   const [aiAnswer, setAiAnswer] = useState(null);
@@ -97,6 +98,7 @@ export default function MemoryExplorer() {
     setIsLoading(true);
     setError(null);
     setExpandedId(null);
+    setIsSourcesExpanded(false);
     // Clear previous AI answer when starting new search
     setAiAnswer(null);
     setAiModel(null);
@@ -367,61 +369,79 @@ export default function MemoryExplorer() {
         ) : (
           <>
             <div className="results-header">
-              {aiAnswer ? (
-                <>📚 Sources ({results.length} memor{results.length === 1 ? 'y' : 'ies'})</>
-              ) : (
-                <>Found {results.length} memor{results.length === 1 ? 'y' : 'ies'}</>
-              )}
-            </div>
-            {results.map((memory) => (
-              <div 
-                key={memory.id} 
-                className={`memory-card ${expandedId === memory.id ? 'expanded' : ''}`}
-                onClick={() => toggleExpand(memory.id)}
+              <button
+                type="button"
+                className="sources-toggle"
+                onClick={() => setIsSourcesExpanded(!isSourcesExpanded)}
+                aria-expanded={isSourcesExpanded}
+                aria-label={isSourcesExpanded ? 'Collapse sources' : 'Expand sources'}
               >
-                <div className="memory-card-header">
-                  <div className="memory-meta">
-                    <span className="memory-agent" title="Agent ID">
-                      🤖 {memory.agent_id}
-                    </span>
-                    {memory.project_id && (
-                      <span className="memory-project" title="Project ID">
-                        📁 {memory.project_id}
-                      </span>
-                    )}
-                    <span className="memory-date" title="Created at">
-                      🕐 {formatDate(memory.created_at)}
-                    </span>
-                    {memory.score !== undefined && (
-                      <span className="memory-score" title="Relevance score">
-                        ⭐ {(memory.score * 100).toFixed(1)}%
-                      </span>
-                    )}
-                  </div>
-                  <div className="memory-expand-icon">
-                    {expandedId === memory.id ? '▼' : '▶'}
-                  </div>
-                </div>
-
-                <div className="memory-content">
-                  {expandedId === memory.id ? (
-                    <RenderMarkdown content={memory.content || ''} />
+                <span>
+                  {aiAnswer ? (
+                    <>📚 Sources ({results.length} memor{results.length === 1 ? 'y' : 'ies'})</>
                   ) : (
-                    truncateContent(memory.content || '')
+                    <>Found {results.length} memor{results.length === 1 ? 'y' : 'ies'}</>
+                  )}
+                </span>
+                <span className="sources-toggle-icon">{isSourcesExpanded ? '▼' : '▶'}</span>
+              </button>
+            </div>
+            {isSourcesExpanded && (
+              results.map((memory) => (
+                <div 
+                  key={memory.id} 
+                  className={`memory-card ${expandedId === memory.id ? 'expanded' : ''}`}
+                  onClick={() => toggleExpand(memory.id)}
+                >
+                  <div className="memory-card-header">
+                    <div className="memory-meta">
+                      <span className="memory-agent" title="Agent ID">
+                        🤖 {memory.agent_id}
+                      </span>
+                      {memory.project_id && (
+                        <span className="memory-project" title="Project ID">
+                          📁 {memory.project_id}
+                        </span>
+                      )}
+                      <span className="memory-date" title="Created at">
+                        🕐 {formatDate(memory.created_at)}
+                      </span>
+                      {memory.score !== undefined && (
+                        <span className="memory-score" title="Relevance score">
+                          ⭐ {(memory.score * 100).toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="memory-expand-icon">
+                      {expandedId === memory.id ? '▼' : '▶'}
+                    </div>
+                  </div>
+
+                  <div className="memory-content">
+                    {expandedId === memory.id ? (
+                      <RenderMarkdown content={memory.content || ''} />
+                    ) : (
+                      truncateContent(memory.content || '')
+                    )}
+                  </div>
+
+                  {memory.tags && memory.tags.length > 0 && (
+                    <div className="memory-tags">
+                      {memory.tags.map((tag, idx) => (
+                        <span key={idx} className="memory-tag">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
-
-                {memory.tags && memory.tags.length > 0 && (
-                  <div className="memory-tags">
-                    {memory.tags.map((tag, idx) => (
-                      <span key={idx} className="memory-tag">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              ))
+            )}
+            {!isSourcesExpanded && (
+              <div className="sources-collapsed-hint">
+                Sources are collapsed. Click to expand.
               </div>
-            ))}
+            )}
           </>
         )}
       </div>

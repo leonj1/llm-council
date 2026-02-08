@@ -190,4 +190,52 @@ describe('MemoryExplorer', () => {
       );
     });
   });
+
+  describe('Sources collapse behavior', () => {
+    it('should keep sources collapsed by default after search and expand on toggle', async () => {
+      const user = userEvent.setup();
+
+      vi.mocked(api.searchMemories).mockResolvedValue({
+        results: [
+          {
+            memory: {
+              id: 'source-memory-1',
+              agent_id: 'agent-1',
+              content: 'Source memory content',
+              embedding: null,
+              project_id: null,
+              tags: ['source'],
+              tsvector_content: '',
+              created_at: '2026-01-01T00:00:00Z',
+              updated_at: '2026-01-01T00:00:00Z',
+            },
+            score: 0.91,
+            match_type: 'vector',
+          },
+        ],
+      });
+
+      renderWithProviders(<MemoryExplorer />);
+
+      await waitFor(() => {
+        expect(api.getMemoryAgents).toHaveBeenCalled();
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search memories...');
+      await user.type(searchInput, 'source query');
+      await user.keyboard('{Enter}');
+
+      await waitFor(() => {
+        expect(api.searchMemories).toHaveBeenCalledTimes(1);
+      });
+
+      expect(screen.getByRole('button', { name: /expand sources/i })).toBeInTheDocument();
+      expect(screen.queryByText('Source memory content')).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /expand sources/i }));
+
+      expect(screen.getByRole('button', { name: /collapse sources/i })).toBeInTheDocument();
+      expect(screen.getByText('Source memory content')).toBeInTheDocument();
+    });
+  });
 });
