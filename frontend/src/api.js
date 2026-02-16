@@ -25,6 +25,17 @@ function handleUnauthorized(response) {
   return false;
 }
 
+function parseSseData(rawData) {
+  if (!rawData) return null;
+
+  try {
+    return JSON.parse(rawData);
+  } catch (error) {
+    console.error('Failed to parse SSE event:', error);
+    return null;
+  }
+}
+
 export const api = {
   /**
    * List all conversations.
@@ -139,16 +150,88 @@ export const api = {
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          try {
-            const event = JSON.parse(data);
+          const event = parseSseData(line.slice(6));
+          if (event) {
             onEvent(event.type, event);
-          } catch (e) {
-            console.error('Failed to parse SSE event:', e);
           }
         }
       }
     }
+  },
+
+  /**
+   * Subscribe to crawler progress SSE updates.
+   * @param {string} targetUlid - Target ULID
+   * @param {string|number} version - Crawl version
+   * @param {function} onEvent - Callback: (eventType, payload) => void
+   * @returns {function} Unsubscribe function
+   */
+  subscribeToCrawlProgress(targetUlid, version, onEvent) {
+    if (!targetUlid || version === undefined || version === null) {
+      return () => {};
+    }
+
+    const token = localStorage.getItem('google_token');
+    const url = new URL(
+      `${API_BASE}/api/crawler/progress/${encodeURIComponent(targetUlid)}/${encodeURIComponent(String(version))}`
+    );
+
+    // EventSource does not support custom headers, so token must be query-based if required.
+    if (token) {
+      url.searchParams.set('token', token);
+    }
+
+    const source = new EventSource(url.toString());
+
+    source.onmessage = (event) => {
+      const payload = parseSseData(event.data);
+      if (payload) {
+        onEvent(payload.type || 'progress', payload);
+      }
+    };
+
+    const forwardEvent = (eventType) => (event) => {
+      const payload = parseSseData(event.data);
+      onEvent(eventType, payload || {});
+    };
+
+    source.addEventListener('progress', forwardEvent('progress'));
+    source.addEventListener('status', forwardEvent('status'));
+    source.addEventListener('complete', forwardEvent('complete'));
+
+    source.onerror = (event) => {
+      onEvent('error', event);
+    };
+
+    return () => {
+      source.close();
+    };
+  },
+
+  /**
+   * Get crawler status for a target/version pair.
+   */
+  async getCrawlerStatus(targetUlid, version) {
+    if (!targetUlid || version === undefined || version === null) {
+      return null;
+    }
+
+    const response = await fetch(
+      `${API_BASE}/api/crawler/status/${encodeURIComponent(targetUlid)}/${encodeURIComponent(String(version))}`,
+      {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      }
+    );
+
+    if (handleUnauthorized(response)) return null;
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error('Failed to get crawler status');
+    }
+
+    return response.json();
   },
 
   /**
