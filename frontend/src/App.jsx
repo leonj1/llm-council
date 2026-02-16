@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import CrawlIndicator from './components/CrawlIndicator';
 import { api } from './api';
 import './App.css';
 
@@ -17,6 +18,16 @@ function App() {
   const [showChat, setShowChat] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [crawlTarget] = useState(
+    () =>
+      new URLSearchParams(window.location.search).get('target_ulid') ||
+      localStorage.getItem('crawl_target_ulid')
+  );
+  const [crawlVersion] = useState(
+    () =>
+      new URLSearchParams(window.location.search).get('version') ||
+      localStorage.getItem('crawl_version')
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -626,6 +637,7 @@ function App() {
           isRegenerating={isRegenerating}
         />
       )}
+      <CrawlIndicator targetUlid={crawlTarget} version={crawlVersion} />
     </div>
   );
 }

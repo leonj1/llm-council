@@ -7,6 +7,16 @@ const API_BASE = '';
 
 export const getApiBase = () => API_BASE;
 
+function parseSseData(rawData) {
+  if (!rawData) return null;
+  try {
+    return JSON.parse(rawData);
+  } catch (error) {
+    console.error('Failed to parse SSE event:', error);
+    return null;
+  }
+}
+
 export const api = {
   /**
    * Get current authenticated user.
@@ -291,6 +301,73 @@ export const api = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
       throw new Error(error.detail || 'Failed to regenerate final script');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Subscribe to crawler progress SSE updates.
+   * @param {string} targetUlid - Target ULID
+   * @param {string|number} version - Crawl version
+   * @param {function} onEvent - Callback: (eventType, payload) => void
+   * @returns {function} Unsubscribe function
+   */
+  subscribeToCrawlProgress(targetUlid, version, onEvent) {
+    if (!targetUlid || version === undefined || version === null) {
+      return () => {};
+    }
+
+    const url = new URL(
+      `${API_BASE}/api/crawler/progress/${encodeURIComponent(targetUlid)}/${encodeURIComponent(String(version))}`,
+      window.location.origin
+    );
+
+    const source = new EventSource(url.toString());
+
+    source.onmessage = (event) => {
+      const payload = parseSseData(event.data);
+      if (payload) {
+        onEvent(payload.type || 'progress', payload);
+      }
+    };
+
+    const forwardEvent = (eventType) => (event) => {
+      const payload = parseSseData(event.data);
+      onEvent(eventType, payload || {});
+    };
+
+    source.addEventListener('progress', forwardEvent('progress'));
+    source.addEventListener('status', forwardEvent('status'));
+    source.addEventListener('complete', forwardEvent('complete'));
+
+    source.onerror = (event) => {
+      onEvent('error', event);
+    };
+
+    return () => {
+      source.close();
+    };
+  },
+
+  /**
+   * Get crawler status for a target/version pair.
+   */
+  async getCrawlerStatus(targetUlid, version) {
+    if (!targetUlid || version === undefined || version === null) {
+      return null;
+    }
+
+    const response = await fetch(
+      `${API_BASE}/api/crawler/status/${encodeURIComponent(targetUlid)}/${encodeURIComponent(String(version))}`,
+      {
+        credentials: 'include',
+      }
+    );
+
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error('Failed to get crawler status');
     }
 
     return response.json();
