@@ -13,6 +13,7 @@ REQUESTY_API_KEY = os.getenv("REQUESTY_API_KEY")
 # API Endpoints
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 REQUESTY_API_URL = "https://router.requesty.ai/v1/chat/completions"
+CRAWLER_SERVICE_URL = os.getenv("CRAWLER_SERVICE_URL", "http://localhost:8001")
 
 # Chairman model - synthesizes final response
 CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
