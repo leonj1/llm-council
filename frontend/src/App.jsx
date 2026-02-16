@@ -3,6 +3,7 @@ import { useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import LoginPage from './components/LoginPage';
+import CrawlIndicator from './components/CrawlIndicator';
 import { api } from './api';
 import './App.css';
 
@@ -12,6 +13,16 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [crawlTarget] = useState(
+    () =>
+      new URLSearchParams(window.location.search).get('target_ulid') ||
+      localStorage.getItem('crawl_target_ulid')
+  );
+  const [crawlVersion] = useState(
+    () =>
+      new URLSearchParams(window.location.search).get('version') ||
+      localStorage.getItem('crawl_version')
+  );
 
   // Load conversations when user is authenticated
   useEffect(() => {
@@ -222,6 +233,7 @@ function App() {
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
       />
+      <CrawlIndicator targetUlid={crawlTarget} version={crawlVersion} />
     </div>
   );
 }
