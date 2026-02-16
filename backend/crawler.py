@@ -78,7 +78,7 @@ async def get_crawler_progress(
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    client = httpx.AsyncClient(timeout=None)
+    client = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10.0))
     request = client.build_request("GET", upstream_url)
 
     try:
