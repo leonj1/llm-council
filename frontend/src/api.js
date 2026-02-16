@@ -2,8 +2,8 @@
  * API client for the LLM Council backend.
  */
 
-// Use relative URLs for production, absolute for development
-const API_BASE = import.meta.env.DEV ? 'http://localhost:8004' : '';
+// Use relative URLs - Vite dev server proxies /api to the backend
+const API_BASE = '';
 
 export const getApiBase = () => API_BASE;
 
