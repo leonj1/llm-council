@@ -269,7 +269,7 @@ class TestMemorySearchParameters:
     @patch('backend.memory.AGENT_MEMORY_API_TOKEN', 'test-token')
     @patch('backend.memory.httpx.AsyncClient')
     def test_search_with_filters(self, mock_client_class, client, admin_session):
-        """Search should pass optional filters to agent-memory-api."""
+        """Search should pass optional filters and auth header to agent-memory-api."""
         mock_client = MagicMock()
         mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -297,8 +297,10 @@ class TestMemorySearchParameters:
         # Verify the call was made with correct parameters
         mock_client.post.assert_called_once()
         call_kwargs = mock_client.post.call_args
+        headers = call_kwargs.kwargs["headers"]
         body = call_kwargs.kwargs["json"]
-        
+
+        assert headers.get("X-API-Key") == "test-token"
         assert body["query"] == "test query"
         assert body["scope"] == "network"
         assert body["limit"] == 10
@@ -308,7 +310,7 @@ class TestMemorySearchParameters:
     @patch('backend.memory.AGENT_MEMORY_API_TOKEN', 'test-token')
     @patch('backend.memory.httpx.AsyncClient')
     def test_search_with_agent_scope(self, mock_client_class, client, admin_session):
-        """Search with agent scope should pass correct X-Agent-ID header."""
+        """Search with agent scope should pass correct headers."""
         mock_client = MagicMock()
         mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -333,4 +335,5 @@ class TestMemorySearchParameters:
         # Verify X-Agent-ID header was set
         call_kwargs = mock_client.post.call_args
         headers = call_kwargs.kwargs["headers"]
+        assert headers.get("X-API-Key") == "test-token"
         assert headers.get("X-Agent-ID") == "jarvis-macbook"

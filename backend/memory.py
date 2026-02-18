@@ -65,7 +65,7 @@ def require_admin(user: dict = Depends(require_auth)) -> dict:
 def _get_headers(agent_id: Optional[str] = None) -> dict:
     """Get headers for agent-memory-api requests."""
     headers = {
-        "Authorization": f"Bearer {AGENT_MEMORY_API_TOKEN}",
+        "X-API-Key": AGENT_MEMORY_API_TOKEN,
         "Content-Type": "application/json",
     }
     if agent_id:
