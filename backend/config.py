@@ -23,11 +23,11 @@ LLM_COUNCIL_MODELS = [
     {
         "primary": {
             "provider": "openrouter",
-            "model": "openai/gpt-5.1"
+            "model": "openai/gpt-5.4"
         },
         "backup": {
             "provider": "requestyai",
-            "model": "openai/gpt-5"
+            "model": "openai/gpt-5.4"
         }
     },
     {
@@ -43,11 +43,11 @@ LLM_COUNCIL_MODELS = [
     {
         "primary": {
             "provider": "openrouter",
-            "model": "anthropic/claude-opus-4.5"
+            "model": "anthropic/claude-opus-4-6"
         },
         "backup": {
             "provider": "requestyai",
-            "model": "anthropic/claude-opus-4-5"
+            "model": "anthropic/claude-opus-4-6"
         }
     },
     {
