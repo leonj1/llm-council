@@ -12,6 +12,7 @@ import uuid
 import json
 import asyncio
 import os
+import httpx
 from pathlib import Path
 
 # Configure verbose logging
@@ -37,7 +38,7 @@ from .movie_script import (
     validate_and_refine_script,
     check_runtime_compliance
 )
-from .config import MOVIE_SCRIPT_DEFAULT_TURNS, MOVIE_SCRIPT_MAX_TURNS, CHAIRMAN_MODEL
+from .config import MOVIE_SCRIPT_DEFAULT_TURNS, MOVIE_SCRIPT_MAX_TURNS, CHAIRMAN_MODEL, OPENROUTER_API_KEY, get_primary_models
 
 app = FastAPI(title="LLM Council API")
 
@@ -68,6 +69,7 @@ class CreateConversationRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
+    council_models: Optional[List[str]] = None
 
 
 class MovieScriptRequest(BaseModel):
@@ -140,6 +142,34 @@ async def get_db_config(user: dict = Depends(require_auth)):
         "database": config.get("database", ""),
         "password": "********" if config.get("password") else "(not set)",
         "connected": connected,
+    }
+
+
+@app.get("/api/models/available")
+async def get_available_models(user: dict = Depends(require_auth)):
+    """Fetch available models from OpenRouter API."""
+    if not OPENROUTER_API_KEY:
+        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not configured")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(
+                "https://openrouter.ai/api/v1/models",
+                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            model_ids = sorted([m["id"] for m in data.get("data", [])])
+            return {"models": model_ids}
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch models from OpenRouter: {str(e)}")
+
+
+@app.get("/api/models/council")
+async def get_council_models(user: dict = Depends(require_auth)):
+    """Return the current hardcoded council models from config."""
+    return {
+        "council_models": get_primary_models(),
+        "chairman_model": CHAIRMAN_MODEL,
     }
 
 
@@ -298,7 +328,8 @@ async def send_message(conversation_id: str, request: SendMessageRequest, user: 
     # Run the 3-stage council process
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
         request.content,
-        conversation_history if conversation_history else None
+        conversation_history if conversation_history else None,
+        council_models=request.council_models if request.council_models else None
     )
 
     # Extract content from stage3 for message storage
@@ -371,7 +402,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest,
 
             # Stage 1: Collect responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content, conversation_history if conversation_history else None)
+            stage1_results = await stage1_collect_responses(request.content, conversation_history if conversation_history else None, council_models=request.council_models if request.council_models else None)
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
             # Stage 2: Collect rankings

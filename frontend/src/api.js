@@ -133,9 +133,32 @@ export const api = {
   },
 
   /**
+   * Read council model cookies and return council_models array if any are set.
+   */
+  _getCouncilModelsFromCookies() {
+    const models = [];
+    let hasAny = false;
+    for (let i = 0; i < 4; i++) {
+      const match = document.cookie.match(new RegExp('(^| )council_model_' + i + '=([^;]+)'));
+      if (match) {
+        models.push(decodeURIComponent(match[2]));
+        hasAny = true;
+      } else {
+        models.push(null);
+      }
+    }
+    return hasAny ? models.filter(m => m !== null) : null;
+  },
+
+  /**
    * Send a message in a conversation.
    */
   async sendMessage(conversationId, content) {
+    const body = { content };
+    const councilModels = this._getCouncilModelsFromCookies();
+    if (councilModels) {
+      body.council_models = councilModels;
+    }
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message`,
       {
@@ -144,7 +167,7 @@ export const api = {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
       }
     );
     if (!response.ok) {
@@ -161,6 +184,11 @@ export const api = {
    * @returns {Promise<void>}
    */
   async sendMessageStream(conversationId, content, onEvent) {
+    const body = { content };
+    const councilModels = this._getCouncilModelsFromCookies();
+    if (councilModels) {
+      body.council_models = councilModels;
+    }
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream`,
       {
@@ -169,7 +197,7 @@ export const api = {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
       }
     );
 

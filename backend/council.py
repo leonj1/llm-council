@@ -1,17 +1,18 @@
 """3-stage LLM Council orchestration."""
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from .openrouter import query_models_parallel, query_model
 from .config import CHAIRMAN_MODEL, get_primary_models
 
 
-async def stage1_collect_responses(user_query: str, conversation_history: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+async def stage1_collect_responses(user_query: str, conversation_history: List[Dict[str, Any]] = None, council_models: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
     Args:
         user_query: The user's question
         conversation_history: Optional list of previous exchanges (user queries + council final responses)
+        council_models: Optional list of model name strings to use instead of default config
 
     Returns:
         List of dicts with 'model' and 'response' keys
@@ -28,7 +29,8 @@ async def stage1_collect_responses(user_query: str, conversation_history: List[D
     messages.append({"role": "user", "content": user_query})
 
     # Query all models in parallel
-    responses = await query_models_parallel(get_primary_models(), messages)
+    models = council_models if council_models else get_primary_models()
+    responses = await query_models_parallel(models, messages)
 
     # Format results
     stage1_results = []
@@ -303,19 +305,20 @@ Title:"""
     return title
 
 
-async def run_full_council(user_query: str, conversation_history: List[Dict[str, Any]] = None) -> Tuple[List, List, Dict, Dict]:
+async def run_full_council(user_query: str, conversation_history: List[Dict[str, Any]] = None, council_models: Optional[List[str]] = None) -> Tuple[List, List, Dict, Dict]:
     """
     Run the complete 3-stage council process.
 
     Args:
         user_query: The user's question
         conversation_history: Optional list of previous exchanges (user queries + council final responses)
+        council_models: Optional list of model name strings to use instead of default config
 
     Returns:
         Tuple of (stage1_results, stage2_results, stage3_result, metadata)
     """
     # Stage 1: Collect individual responses
-    stage1_results = await stage1_collect_responses(user_query, conversation_history)
+    stage1_results = await stage1_collect_responses(user_query, conversation_history, council_models=council_models)
 
     # If no models responded successfully, return error
     if not stage1_results:

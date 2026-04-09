@@ -8,6 +8,7 @@ import App from './App.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import MemoriesPage from './pages/MemoriesPage.jsx'
 import CrawlerPage from './pages/CrawlerPage.jsx'
+import ModelsPage from './pages/ModelsPage.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -20,6 +21,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="/chat/:conversationId" element={<App />} />
             <Route path="/memories" element={<MemoriesPage />} />
             <Route path="/crawler" element={<CrawlerPage />} />
+            <Route path="/models" element={<ModelsPage />} />
           </Routes>
         </BrowserRouter>
       </ToastProvider>
